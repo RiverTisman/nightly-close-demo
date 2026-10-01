@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nightly Close &mdash; Daily Close</title>
+<script src="/static/results_cache.js?v={{ asset_version }}"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { AvraResultsCache.restore('daily_close'); });</script>
+<link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+</head>
+<body>
+  {% include "_nav.html" %}
+  <div class="ticket-rail">
+    <header class="masthead">
+      <span class="masthead-mark">Close-out workflow</span>
+      <h1>Daily Close</h1>
+      <p class="subtitle">Drop in tonight's exports and get the ready-to-paste Tip Sheet.</p>
+    </header>
+
+    <form action="/run-check" method="post" enctype="multipart/form-data" class="ticket">
+    <div class="demo-load">
+      <button type="button" id="demo-load" class="demo-load-button">Load sample files</button>
+      <span class="fine-print">Fills in the date and every upload below with tonight's fictional exports.</span>
+    </div>
+
+      <div class="shift-select">
+        <span class="date-field-label">Which service is this?</span>
+        <label><input type="radio" name="shift_filter" value="BOTH" checked> Full day</label>
+        <label><input type="radio" name="shift_filter" value="AM"> Lunch close (AM)</label>
+        <label><input type="radio" name="shift_filter" value="PM"> Dinner close (PM)</label>
+      </div>
+
+      <label class="date-field">
+        <span class="date-field-label">Date being closed tonight</span>
+        <input type="date" name="roster_date">
+      </label>
+
+      <div class="ticket-header">
+        <span class="ticket-no">01</span>
+        <span class="ticket-title">Toast Shift Report</span>
+        <span class="ticket-tag">servers &middot; bartender pool</span>
+      </div>
+      <label class="dropzone">
+        <input type="file" name="toast_csv" accept=".csv" data-persist>
+        <span class="dropzone-label">Drop the Toast Shift Report CSV here, or click to browse</span>
+        <span class="dropzone-ext">.csv</span>
+      </label>
+
+      <div class="ticket-header">
+        <span class="ticket-no">02</span>
+        <span class="ticket-title">HotSchedules Roster</span>
+        <span class="ticket-tag">daily export &middot; one day per run</span>
+      </div>
+      <label class="dropzone">
+        <input type="file" name="hotschedules_daily" accept=".xls,.xlsx" data-persist>
+        <span class="dropzone-label">Drop the daily roster file here, or click to browse</span>
+        <span class="dropzone-ext">.xlsx</span>
+      </label>
+      <p class="fine-print" style="margin:-14px 26px 18px;">Export as <strong>Excel XP-2007</strong> from HotSchedules' Roster Report export menu &mdash; other formats (Excel 97-2000, PDF, Web, Word) are rejected.</p>
+
+      <div class="date-field" style="background:#faf8f2;">
+        <span class="date-field-label">Were any employees cut from the tip pool tonight?</span>
+        <div id="cut-picker"></div>
+      </div>
+
+      <div class="date-field" style="background:#faf8f2;">
+        <span class="date-field-label">Did anyone work a different support-staff role than scheduled?</span>
+        <div id="role-swap-picker"></div>
+      </div>
+
+      <button type="submit" class="fire-button">Fire</button>
+    </form>
+  </div>
+  <script src="/static/file_cache.js?v={{ asset_version }}"></script>
+  <script src="/static/ui.js?v={{ asset_version }}"></script>
+  <script src="/static/staff_picker.js?v={{ asset_version }}"></script>
+  <script src="/static/date_memory.js?v={{ asset_version }}"></script>
+  <script>
+    AvraFileCache.init('daily_close');
+    AvraDateMemory.init();
+    var avraStaffList = {{ staff_list_json|safe if staff_list_json else '[]' }};
+    document.addEventListener('DOMContentLoaded', function () {
+      AvraStaffPicker.init(document.getElementById('cut-picker'), avraStaffList, {
+        hiddenInputName: 'cut_employees_json',
+        placeholder: 'Type a name...',
+      });
+      AvraStaffPicker.init(document.getElementById('role-swap-picker'), avraStaffList, {
+        hiddenInputName: 'role_swap_json',
+        placeholder: 'Type a name...',
+        extraField: {
+          key: 'role',
+          options: [
+            {value: 'Busser', label: 'Busser'},
+            {value: 'Runner', label: 'Runner'},
+            {value: 'Barista', label: 'Barista'},
+            {value: 'Barback', label: 'Barback'}
+          ]
+        }
+      });
+    });
+  </script>
+  <script src="/static/demo.js?v={{ asset_version }}"></script>
+  <script>NightlyCloseDemo.init('demo-load', {toast_csv: "toast_shift_report.csv", hotschedules_daily: "hotschedules_roster.xls"});</script>
+</body>
+</html>

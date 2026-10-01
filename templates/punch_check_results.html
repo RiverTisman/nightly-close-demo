@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Punch Report Check Results &mdash; Nightly Close</title>
+<link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+</head>
+<body>
+  {% include "_nav.html" %}
+  <div class="ticket-rail">
+    {% set shift_label = {'AM': 'Lunch Service', 'PM': 'Dinner Service', 'BOTH': 'Full Day'}[result.get('shift_filter', 'BOTH')] %}
+    <header class="masthead masthead-compact">
+      <div>
+        <span class="masthead-mark">Results &middot; {{ shift_label }}</span>
+        <h1>Punch Report Check results</h1>
+      </div>
+      <a href="/punch-report-check" class="back-link">&larr; run another</a>
+    </header>
+
+    {% if result.get('shift_filter') and result.shift_filter != 'BOTH' %}
+    <p class="fine-print" style="margin:0 0 16px;">Showing {{ 'lunch (AM)' if result.shift_filter == 'AM' else 'dinner (PM)' }} only.</p>
+    {% endif %}
+
+    {% if error %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header"><span class="ticket-title">Something went wrong</span></div>
+      <pre class="raw-error">{{ error }}</pre>
+    </div>
+    {% endif %}
+
+    {% if result.get('clock_review_missing_date') %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header"><span class="ticket-title">Missing a date</span></div>
+      <p class="raw-error" style="background:var(--flag-bg);color:var(--flag-text);">ADP punch report uploaded, but no date was entered &mdash; go back and fill in the date field so punches can be matched to the right night.</p>
+    </div>
+    {% endif %}
+
+    {% if result.get('mapping_dropdown_check_error') %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header"><span class="ticket-title">Couldn't check names against the Tip Sheet dropdown</span></div>
+      <p class="raw-error" style="background:var(--flag-bg);color:var(--flag-text);">{{ result.mapping_dropdown_check_error }}</p>
+    </div>
+    {% endif %}
+
+    {% if result.get('mapping_dropdown_check') %}
+    {% set mdc = result.mapping_dropdown_check %}
+    <div class="ticket{{ ' ticket-error' if mdc.mismatches else '' }}">
+      <div class="ticket-header">
+        <span class="ticket-title">Mapping check against this Tip Sheet's dropdown</span>
+        <span class="ticket-tag">{{ mdc.checked_count }} employees checked{% if mdc.mismatches %} &mdash; {{ mdc.mismatches|length }} mismatch{{ 'es' if mdc.mismatches|length != 1 else '' }} found{% endif %}</span>
+      </div>
+      {% if mdc.mismatches %}
+      <p class="fine-print" style="margin:0 0 12px 20px;">These names won't register as "selected" in the real Tip Sheet dropdown when pasted &mdash; a mismatch here has silently dropped someone's entire tip-out share from a night's grand total before. Fix these in <code>employee_mapping.json</code> to match the "Real dropdown text" column exactly.</p>
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>EID</th><th>Currently mapped</th><th>Real dropdown text</th></tr></thead>
+        <tbody>
+          {% for m in mdc.mismatches %}
+          <tr class="row-flag">
+            <td>{{ m.canonical }}</td>
+            <td>{{ m.eid }}</td>
+            <td>{{ m.mapped or '(none)' }}</td>
+            <td>{{ m.real }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-note">Every active, EID-linked employee's mapped name matches this Tip Sheet's dropdown exactly. Nothing to fix.</p>
+      {% endif %}
+      {% if mdc.not_found %}
+      <p class="fine-print" style="margin:12px 0 0 20px;">{{ mdc.not_found|length }} active employee{{ 's' if mdc.not_found|length != 1 else '' }} not found anywhere in this workbook's EID list, so couldn't be checked: {{ mdc.not_found|map(attribute='canonical')|join(', ') }}.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if result.get('clock_review') is not none %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-no">01</span>
+        <span class="ticket-title">ADP clock-in/out check{% if result.clock_review_date %} &mdash; {{ result.clock_review_date }}{% endif %}</span>
+        <span class="ticket-tag">{{ result.clock_review_needs_review_count }} of {{ result.clock_review|length }} need review</span>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Shift</th><th>Job</th><th>Name</th><th>In</th><th>Out</th><th>Hours</th><th></th></tr></thead>
+        <tbody>
+          {% for r in result.clock_review|sort(attribute='needs_review', reverse=True) %}
+          <tr class="{{ 'row-flag' if r.needs_review else '' }}">
+            <td>{{ r.shift or '' }}</td>
+            <td>{{ r.job_role }}</td>
+            <td>{{ r.canonical or r.name }}</td>
+            <td>{{ r.in_time }}</td>
+            <td>{{ r.out_time }}</td>
+            <td class="num">{{ "%.2f"|format(r.hours) }}</td>
+            <td>{% if r.needs_review %}<span class="flag-pill">REVIEW</span>{% endif %}</td>
+          </tr>
+          {% if r.needs_review %}
+          <tr class="row-flag">
+            <td colspan="7" style="padding-top:0;">
+              <ul class="flag-list">
+                {% for reason in r.review_reasons %}<li>{{ reason }}</li>{% endfor %}
+              </ul>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if result.get('missing_clockouts_need_hotsched') %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header"><span class="ticket-title">Missing clock-out(s) found</span></div>
+      <p class="raw-error" style="background:var(--flag-bg);color:var(--flag-text);">At least one person above has no clock-out recorded. Go back and add the HotSchedules daily roster too, and this can suggest a clock-out time based on when their fellow Openers/Mids/Closers in the same role actually left that shift.</p>
+    </div>
+    {% endif %}
+
+    {% if result.get('recommended_clockouts') %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-title">Recommended clock-out times</span>
+        <span class="ticket-tag">{{ result.recommended_clockouts|length }} missing clock-out{{ 's' if result.recommended_clockouts|length != 1 else '' }}</span>
+      </div>
+      <p class="fine-print" style="margin:0 0 12px 20px;">Averaged from peers in the same role and the same Opener/Mid/Closer shift type (from the HotSchedules note) who clocked out normally that shift. A suggestion to confirm with the employee, never a real punch.</p>
+      <table class="data-table">
+        <thead><tr><th>Shift</th><th>Job</th><th>Name</th><th>In</th><th>Shift Type</th><th>Recommended Out</th></tr></thead>
+        <tbody>
+          {% for r in result.recommended_clockouts %}
+          <tr class="{{ 'row-flag' if not r.recommended_out else '' }}">
+            <td>{{ r.shift or '' }}</td>
+            <td>{{ r.job_role }}</td>
+            <td>{{ r.name }}</td>
+            <td>{{ r.in_time }}</td>
+            <td>{{ r.shift_type or 'unknown' }}</td>
+            <td>{{ r.recommended_out or 'none' }}</td>
+          </tr>
+          <tr class="{{ 'row-flag' if not r.recommended_out else '' }}">
+            <td colspan="6" style="padding-top:0;">
+              <p class="fine-print" style="margin:0 0 8px;">{{ r.note }}</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if result.get('cut_review') %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-no">02</span>
+        <span class="ticket-title">Possible early cuts</span>
+        <span class="ticket-tag">{{ result.cut_review|length }} flagged</span>
+      </div>
+      <p class="fine-print" style="margin:0 0 12px 20px;">Clock-outs 2+ hours before the last peer in the same role &amp; shift that night. Not a computed % Cut &mdash; a manager judgment call, this just makes sure it isn't missed.</p>
+      <table class="data-table">
+        <thead><tr><th>Shift</th><th>Role</th><th>Name</th><th>Clocked out</th><th>Last peer out</th><th>Gap</th></tr></thead>
+        <tbody>
+          {% for r in result.cut_review %}
+          <tr class="row-flag">
+            <td>{{ r.shift }}</td>
+            <td>{{ r.job_role }}</td>
+            <td>{{ r.name }}</td>
+            <td>{{ r.out_time }}</td>
+            <td>{{ r.latest_peer_out }}</td>
+            <td class="num" style="color:var(--review);font-weight:600;">{{ r.gap_hours }}h</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if result.get('tip_sheet_reconciliation_errors') %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header"><span class="ticket-title">Couldn't read the Tip Sheet</span></div>
+      {% for e in result.tip_sheet_reconciliation_errors %}
+      <p class="raw-error" style="background:var(--flag-bg);color:var(--flag-text);">{{ e }}</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if result.get('tip_sheet_reconciliation') %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-no">03</span>
+        <span class="ticket-title">Tip Sheet vs. ADP{% if result.clock_review_date %} &mdash; {{ result.clock_review_date }}{% endif %}</span>
+        <span class="ticket-tag">{{ result.tip_sheet_reconciliation_needs_review_count }} of {{ result.tip_sheet_reconciliation|length }} need review</span>
+      </div>
+      <p class="fine-print" style="margin:0 0 12px 20px;">Everyone from either source, by department then alphabetically. On Tip Sheet with no ADP punch: confirm they worked or remove them. ADP punch with no Tip Sheet entry: add them. Department mismatch: they'd be paid incorrectly.</p>
+      <table class="data-table">
+        <thead><tr><th>Dept</th><th>Shift</th><th>Name</th><th>On Sheet</th><th>ADP Punch</th><th></th></tr></thead>
+        <tbody>
+          {% for r in result.tip_sheet_reconciliation %}
+          <tr class="{{ 'row-flag' if r.needs_review else '' }}">
+            <td>{{ r.role }}</td>
+            <td>{{ r.shift }}</td>
+            <td>{{ r.name }}</td>
+            <td>{{ 'Yes' if r.on_tip_sheet else 'No' }}</td>
+            <td>{{ 'Yes' if r.has_adp_punch else 'No' }}</td>
+            <td>{% if r.needs_review %}<span class="flag-pill">REVIEW</span>{% endif %}</td>
+          </tr>
+          {% if r.needs_review %}
+          <tr class="row-flag">
+            <td colspan="6" style="padding-top:0;">
+              <ul class="flag-list">
+                {% for reason in r.review_reasons %}<li>{{ reason }}</li>{% endfor %}
+              </ul>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if result.get('clock_review') is none and not result.get('clock_review_missing_date') %}
+    <div class="ticket"><p class="empty-note">No ADP Punch Report was processed. Go back and choose a file (and a date).</p></div>
+    {% endif %}
+  </div>
+  {% if not error and not result.get('clock_review_missing_date') %}
+  <script src="/static/file_cache.js?v={{ asset_version }}"></script>
+  <script>AvraFileCache.clear('punch_check', ['adp_punches', 'tip_sheet_daily', 'hotschedules_daily']);</script>
+  <script src="/static/results_cache.js?v={{ asset_version }}"></script>
+  <script>AvraResultsCache.initResultsPage('punch_check');</script>
+  {% endif %}
+</body>
+</html>

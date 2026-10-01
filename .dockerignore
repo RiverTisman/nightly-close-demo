@@ -1,0 +1,10 @@
+# Keep the deployed web app image lean -- these aren't needed at runtime,
+# they're for local/reference use only (docs, standalone CLI tool, git history).
+.git/
+docs/
+cli_tool/
+README.md
+__pycache__/
+*.pyc
+.venv/
+venv/

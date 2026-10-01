@@ -1,0 +1,62 @@
+{% set role_rows = result.support_staff_review|selectattr('role', 'equalto', role)|list %}
+{% if role_rows %}
+<div class="ticket">
+  <div class="ticket-header">
+    <span class="ticket-title">{{ role }}</span>
+    <span class="ticket-tag"><span class="role-included-count" id="role-included-{{ role|lower }}">{{ role_rows|length }}</span> on tonight's sheet</span>
+  </div>
+
+  {% set am_rows = role_rows|selectattr('shift', 'equalto', 'AM')|list %}
+  {% set pm_rows = role_rows|selectattr('shift', 'equalto', 'PM')|list %}
+  {% if am_rows %}<textarea id="copy-{{ role|lower }}-am" class="copy-source"></textarea>{% endif %}
+  {% if pm_rows %}<textarea id="copy-{{ role|lower }}-pm" class="copy-source"></textarea>{% endif %}
+  <div class="copy-buttons">
+    {% if am_rows %}<button type="button" class="copy-btn support-copy-btn" data-source="copy-{{ role|lower }}-am" data-role="{{ role }}" data-shift="AM">Copy AM for Excel (<span class="copy-count">0</span>)</button>{% endif %}
+    {% if pm_rows %}<button type="button" class="copy-btn support-copy-btn" data-source="copy-{{ role|lower }}-pm" data-role="{{ role }}" data-shift="PM">Copy PM for Excel (<span class="copy-count">0</span>)</button>{% endif %}
+  </div>
+  <p class="fine-print" style="margin:8px 0 12px 20px;">Copies just the Name column, one per line &mdash; the sheet's own % Cut default stays as-is unless you adjust it after seeing a flag below. On-call rows must be confirmed before they're included.</p>
+
+  <table class="data-table">
+    <thead><tr><th>Shift</th><th>Employee</th><th>ADP Punch</th><th></th></tr></thead>
+    <tbody>
+      {% for r in role_rows %}
+      <tr class="{{ 'row-flag' if r.needs_review else '' }}">
+        <td>{{ r.shift }}</td>
+        <td>{{ r.employee }}</td>
+        <td id="support-punch-{{ r.id }}">{% if r.has_adp_punch is none %}<span class="pending">not checked</span>{% elif r.has_adp_punch %}Yes{% else %}No{% endif %}</td>
+        <td>{% if r.needs_review %}<span class="flag-pill">REVIEW</span>{% endif %}</td>
+      </tr>
+      {% if r.needs_review %}
+      <tr class="row-flag">
+        <td colspan="4" style="padding-top:0;">
+          {% if r.hotsched_note %}<p class="fine-print" style="margin:4px 0 8px;">HotSchedules note: {{ r.hotsched_note }}</p>{% endif %}
+          {% if r.adp_flags %}
+          <ul class="flag-list">
+            {% for f in r.adp_flags %}<li>{{ f }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+          {% if r.is_terminated %}
+          <p class="fine-print" style="margin:0;color:var(--review);">Terminated employee &mdash; left off the pastable roster automatically, no confirmation needed.</p>
+          {% elif r.is_on_call or r.is_house_shift or r.is_trainee %}
+          <div class="oncall-resolve" data-row-id="{{ r.id }}">
+            <p class="fine-print" style="margin:0 0 6px;">
+              {% if r.is_trainee %}This is a trainee ({{ r.hotsched_note }})
+              {% elif r.is_on_call and r.is_house_shift %}This was an on-call House Shift
+              {% elif r.is_house_shift %}This was a House Shift someone picked up
+              {% else %}This was an on-call shift
+              {% endif %} &mdash; confirm whether {{ r.employee }} actually worked before including on the sheet.</p>
+            <div class="copy-buttons">
+              <button type="button" class="copy-btn" data-action="worked">Confirm worked</button>
+              <button type="button" class="copy-btn" data-action="not-worked">Confirm did not work</button>
+            </div>
+            <p class="oncall-resolved-note summary-good" style="display:none;margin:6px 0 0;"></p>
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

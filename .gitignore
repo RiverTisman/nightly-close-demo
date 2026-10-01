@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.DS_Store
+*.egg-info/
+
+# Claude Code local permission overrides -- personal, not shared
+.claude/settings.local.json

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Close Results &mdash; Nightly Close</title>
+<link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+</head>
+<body>
+  {% include "_nav.html" %}
+  <div class="ticket-rail">
+    {% set shift_label = {'AM': 'Lunch Service', 'PM': 'Dinner Service', 'BOTH': 'Full Day'}[result.get('shift_filter', 'BOTH')] %}
+    <header class="masthead masthead-compact">
+      <div>
+        <span class="masthead-mark">Results &middot; {{ shift_label }}</span>
+        <h1>Daily Close results</h1>
+      </div>
+      <a href="/" class="back-link">&larr; run another</a>
+    </header>
+
+    {% if result.get('shift_filter') and result.shift_filter != 'BOTH' %}
+    <p class="fine-print" style="margin:0 0 16px;">Showing {{ 'lunch (AM)' if result.shift_filter == 'AM' else 'dinner (PM)' }} only.</p>
+    {% endif %}
+
+    {% if error %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header"><span class="ticket-title">Something went wrong</span></div>
+      <pre class="raw-error">{{ error }}</pre>
+    </div>
+    {% endif %}
+
+    {% if result.get('clock_review_missing_date') %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header"><span class="ticket-title">Missing a date</span></div>
+      <p class="raw-error" style="background:var(--flag-bg);color:var(--flag-text);">ADP punch report uploaded, but no date was entered &mdash; go back and fill in "Date being closed tonight" so punches can be matched to the right night.</p>
+    </div>
+    {% endif %}
+
+    {% if result.get('cut_confirmation') %}
+    {% set cc = result.cut_confirmation %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-title">Cut confirmation</span>
+        <span class="ticket-tag">your report is the source of truth</span>
+      </div>
+
+      {% if cc.unrecognized %}
+      <h3 class="group-label" style="color:var(--review);">Not recognized &mdash; check spelling</h3>
+      <ul class="flag-list">
+        {% for n in cc.unrecognized %}<li>{{ n }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if cc.confirmed %}
+      <h3 class="group-label" style="color:var(--good);">Confirmed &mdash; you reported these, and the backend checks agree</h3>
+      <ul class="flag-list" style="color:var(--body-text);">
+        {% for c in cc.confirmed %}<li><strong>{{ c.name }}</strong> &mdash; {{ c.reasons|join('; ') }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if cc.manager_only %}
+      <h3 class="group-label">You reported these, no independent signal found <span class="section-hint">proceeding on your word</span></h3>
+      <ul class="flag-list" style="color:var(--body-text);">
+        {% for c in cc.manager_only %}<li>{{ c.name }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if cc.backend_only %}
+      <h3 class="group-label" style="color:var(--review);">Backend checks flagged these, but you didn't report them &mdash; double check</h3>
+      <ul class="flag-list">
+        {% for c in cc.backend_only %}<li><strong>{{ c.name }}</strong> &mdash; {{ c.reasons|join('; ') }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if result.get('role_swap_applied') or result.get('role_swap_unrecognized') %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-title">Role swaps</span>
+        <span class="ticket-tag">moved to the role actually worked in the pastable output below</span>
+      </div>
+      {% if result.role_swap_unrecognized %}
+      <h3 class="group-label" style="color:var(--review);">Not recognized &mdash; the mapping changed since this page loaded, please re-pick</h3>
+      <ul class="flag-list">
+        {% for n in result.role_swap_unrecognized %}<li>{{ n.canonical }} &mdash; {{ n.role }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+      {% if result.role_swap_applied %}
+      <h3 class="group-label" style="color:var(--good);">Applied</h3>
+      <ul class="flag-list" style="color:var(--body-text);">
+        {% for s in result.role_swap_applied %}<li><strong>{{ s.canonical }}</strong> &mdash; moved to {{ s.new_role }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if result.get('server_review') is not none %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-no">01</span>
+        <span class="ticket-title">Server tip entries</span>
+        <span class="ticket-tag">{{ result.server_review|length }} rows</span>
+      </div>
+
+      {% set am_rows = result.server_review|selectattr('shift', 'equalto', 'AM')|rejectattr('excluded_from_pool')|list %}
+      {% set pm_rows = result.server_review|selectattr('shift', 'equalto', 'PM')|rejectattr('excluded_from_pool')|list %}
+      {% set excluded_count = result.server_review|selectattr('excluded_from_pool')|list|length %}
+      {% if am_rows %}<textarea id="copy-am" class="copy-source"></textarea>{% endif %}
+      {% if pm_rows %}<textarea id="copy-pm" class="copy-source"></textarea>{% endif %}
+      <div class="copy-buttons">
+        {% if am_rows %}<button type="button" class="copy-btn server-copy-btn" data-source="copy-am" data-shift="AM">Copy AM for Excel (<span class="copy-count">{{ am_rows|length }}</span> rows)</button>{% endif %}
+        {% if pm_rows %}<button type="button" class="copy-btn server-copy-btn" data-source="copy-pm" data-shift="PM">Copy PM for Excel (<span class="copy-count">{{ pm_rows|length }}</span> rows)</button>{% endif %}
+      </div>
+      <p class="fine-print" style="margin:8px 0 12px 20px;">Copies Name / Cash / Credit as plain tab-separated text (no flag rows, no styling) &mdash; paste straight into the daily sheet's Name/Cash/Credit columns and it adopts the sheet's own formatting.{% if excluded_count %} {{ excluded_count }} row{{ 's' if excluded_count != 1 else '' }} under the 4h tip-pool minimum {{ 'are' if excluded_count != 1 else 'is' }} left out of the copy buttons (still shown below, flagged) &mdash; confirm before adding manually.{% endif %}</p>
+
+      {% set am_cash_sales = result.server_review|selectattr('shift', 'equalto', 'AM')|selectattr('cash_sales_number')|selectattr('cash_sales')|list %}
+      {% set pm_cash_sales = result.server_review|selectattr('shift', 'equalto', 'PM')|selectattr('cash_sales_number')|selectattr('cash_sales')|list %}
+      {% if am_cash_sales or pm_cash_sales %}
+      <h3 class="group-label">Master Server Cash Sales Sheet</h3>
+      {% if am_cash_sales %}<textarea id="copy-cashnum-am" class="copy-source"></textarea><textarea id="copy-cashamt-am" class="copy-source"></textarea>{% endif %}
+      {% if pm_cash_sales %}<textarea id="copy-cashnum-pm" class="copy-source"></textarea><textarea id="copy-cashamt-pm" class="copy-source"></textarea>{% endif %}
+      <div class="copy-buttons">
+        {% if am_cash_sales %}
+        <button type="button" class="copy-btn cash-sales-copy-btn" data-source="copy-cashnum-am" data-shift="AM" data-field="num">Copy AM Numbers (<span class="copy-count">{{ am_cash_sales|length }}</span>)</button>
+        <button type="button" class="copy-btn cash-sales-copy-btn" data-source="copy-cashamt-am" data-shift="AM" data-field="amt">Copy AM Cash (<span class="copy-count">{{ am_cash_sales|length }}</span>)</button>
+        {% endif %}
+        {% if pm_cash_sales %}
+        <button type="button" class="copy-btn cash-sales-copy-btn" data-source="copy-cashnum-pm" data-shift="PM" data-field="num">Copy PM Numbers (<span class="copy-count">{{ pm_cash_sales|length }}</span>)</button>
+        <button type="button" class="copy-btn cash-sales-copy-btn" data-source="copy-cashamt-pm" data-shift="PM" data-field="amt">Copy PM Cash (<span class="copy-count">{{ pm_cash_sales|length }}</span>)</button>
+        {% endif %}
+      </div>
+      <p class="fine-print" style="margin:8px 0 12px 20px;">Two separate single-column pastes, in the same row order &mdash; "Numbers" goes in the sheet's Number column, "Cash" goes in its Cash column. Kept separate because the Name column in between is a formula (VLOOKUP) that a normal multi-column paste would overwrite. Denominations stay blank for a manager to fill in. Anyone not yet mapped to a cash-sales number, or with $0 in cash sales, is left off the sheet entirely (zero-cash servers are still shown in the table below, just not pasted).</p>
+      {% endif %}
+
+      <table class="data-table">
+        <thead><tr><th>Shift</th><th>Tip Sheet Name</th><th>Cash</th><th>Credit</th><th>Cash Sales</th><th>Hours</th><th></th></tr></thead>
+        <tbody>
+          {% for r in result.server_review %}
+          <tr class="{{ 'row-flag' if r.needs_review else '' }}">
+            <td>{{ r.shift }}</td>
+            <td>{{ r.tip_sheet_name }}</td>
+            <td class="num">{{ "%.2f"|format(r.cash) }}</td>
+            <td class="num" id="credit-{{ loop.index0 }}">{{ "%.2f"|format(r.credit) }}</td>
+            <td class="num">{{ r.cash_sales }}</td>
+            <td class="num">{{ "%.2f"|format(r.hours) }}</td>
+            <td>{% if r.needs_review %}<span class="flag-pill">REVIEW</span>{% endif %}</td>
+          </tr>
+          {% if r.large_gratuity > 0 %}
+          <tr>
+            <td colspan="7" style="padding-top:0;padding-bottom:6px;">
+              <div class="gratuity-resolve" data-row-id="{{ loop.index0 }}" data-shift="{{ r.shift }}">
+                <a href="#" class="gratuity-toggle fine-print" style="color:var(--muted-lighter);">Includes ${{ "%.2f"|format(r.large_gratuity) }} gratuity from a large party, already added above &mdash; split with bar team instead?</a>
+                <div class="gratuity-manual-inputs" style="display:none;margin-top:8px;">
+                  <label class="fine-print" style="display:block;margin:0 0 4px;">{{ r.tip_sheet_name }}'s share
+                    <input type="number" step="0.01" class="manual-server-share" style="display:block;margin-top:2px;padding:6px;border:1px solid var(--line);border-radius:3px;font-family:inherit;">
+                  </label>
+                  <label class="fine-print" style="display:block;margin:8px 0 4px;">Bartenders' share ({{ r.shift }})
+                    <input type="number" step="0.01" class="manual-bartender-share" style="display:block;margin-top:2px;padding:6px;border:1px solid var(--line);border-radius:3px;font-family:inherit;">
+                  </label>
+                  <div class="copy-buttons" style="margin-top:8px;">
+                    <button type="button" class="copy-btn apply-manual-btn">Apply split</button>
+                    <button type="button" class="copy-btn gratuity-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+                <p class="gratuity-resolved-note summary-good" style="display:none;margin:6px 0 0;"></p>
+              </div>
+            </td>
+          </tr>
+          {% endif %}
+          {% if r.needs_review %}
+          <tr class="row-flag">
+            <td colspan="7" style="padding-top:0;">
+              <ul class="flag-list">
+                {% for reason in r.review_reasons %}<li>{{ reason }}</li>{% endfor %}
+              </ul>
+              {% if r.exclusion_reason == 'under_4h' %}
+              <div class="under4h-resolve" data-row-id="{{ loop.index0 }}" data-shift="{{ r.shift }}">
+                <button type="button" class="copy-btn" data-action="add">Add to tip sheet anyway</button>
+                <p class="under4h-resolved-note summary-good" style="display:none;margin:6px 0 0;"></p>
+              </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% if result.bartender_pools %}
+      <h3 class="section-label">Bartender pool totals (name needs manual entry)</h3>
+      <table class="data-table">
+        <thead><tr><th>Shift</th><th>Cash</th><th>Credit</th></tr></thead>
+        <tbody>
+          {% for shift, p in result.bartender_pools.items() %}
+          <tr><td>{{ shift }}</td><td class="num">{{ "%.2f"|format(p.cash) }}</td><td class="num" id="bartender-credit-{{ shift }}">{{ "%.2f"|format(p.credit) }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      {% if result.toast_anomalies %}
+      <h3 class="group-label">Anomalies flagged</h3>
+      <ul class="flag-list" style="color:var(--body-text);">
+        {% for a in result.toast_anomalies %}
+        <li><strong>{{ a.name }}</strong> &mdash; {{ a.clock_in }} &mdash; {{ a.reason }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if result.unmatched_toast_names %}
+      <h3 class="group-label">Unmatched Toast names <span class="section-hint">add to employee_mapping.json</span></h3>
+      <ul class="flag-list" style="color:var(--body-text);">
+        {% for n in result.unmatched_toast_names %}<li>{{ n }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if result.get('support_staff_review') %}
+    <p class="section-label" style="margin:22px 20px 4px;">Support staff <span class="section-hint">from HotSchedules</span></p>
+    {% for role in ['Busser', 'Runner', 'Barista', 'Barback'] %}
+    {% include "_support_staff_role.html" %}
+    {% endfor %}
+    {% endif %}
+
+    {% if result.get('daily_roster_review') is not none %}
+    <details class="ticket">
+      <summary class="ticket-header">
+        <span class="ticket-no">02</span>
+        <span class="ticket-title">HotSchedules daily roster{% if result.daily_roster_date %} &mdash; {{ result.daily_roster_date }}{% endif %}</span>
+        <span class="ticket-tag">{{ result.daily_roster_needs_review_count }} of {{ result.daily_roster_review|length }} need review</span>
+      </summary>
+
+      {% if not result.daily_roster_date %}
+      <p class="empty-note" style="color:var(--review);">No date was entered for this roster &mdash; go back and fill in the date field so this can be matched to the right Tip Sheet day.</p>
+      {% endif %}
+
+      <table class="data-table">
+        <thead><tr><th>Shift</th><th>Role</th><th>Employee</th><th>Flag</th><th>Note</th><th>Start</th><th></th></tr></thead>
+        <tbody>
+          {% for r in result.daily_roster_review|sort(attribute='shift')|sort(attribute='needs_review', reverse=True) %}
+          <tr class="{{ 'row-flag' if r.needs_review else '' }}">
+            <td>{{ r.shift }}</td>
+            <td>{{ r.role }}</td>
+            <td>{{ r.employee }}</td>
+            <td>{{ r.flag }}</td>
+            <td>{{ r.note }}</td>
+            <td>{{ r.start }}</td>
+            <td>{% if r.needs_review %}<span class="flag-pill">REVIEW</span>{% endif %}</td>
+          </tr>
+          {% if r.needs_review %}
+          <tr class="{{ 'row-flag' if r.needs_review else '' }}">
+            <td colspan="7" style="padding-top:0;">
+              <ul class="flag-list">
+                {% for reason in r.review_reasons %}<li>{{ reason }}</li>{% endfor %}
+              </ul>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% endif %}
+
+    {% if result.get('server_review') is none and result.get('daily_roster_review') is none %}
+    <div class="ticket"><p class="empty-note">No files were processed. Go back and choose at least one file.</p></div>
+    {% endif %}
+  </div>
+  <script>
+    var serverRows = {{ result.server_rows_json|safe if result.get('server_rows_json') else '[]' }};
+    var bartenderPools = {{ result.bartender_pools_json|safe if result.get('bartender_pools_json') else '{}' }};
+
+    function fmt2(n) { return (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2); }
+    function fmtWhole(n) { return Math.round(n + Number.EPSILON).toString(); }
+
+    function rebuildCopySource(shift) {
+      var el = document.getElementById('copy-' + shift.toLowerCase());
+      if (!el) return;
+      var included = serverRows.filter(function (r) { return r.shift === shift && !r.excluded; });
+      var lines = included.map(function (r) { return r.name + '\t' + fmt2(r.cash) + '\t' + fmt2(r.credit); });
+      el.value = lines.length ? lines.join('\n') + '\n' : '';
+      document.querySelectorAll('.server-copy-btn[data-shift="' + shift + '"] .copy-count')
+        .forEach(function (span) { span.textContent = included.length; });
+    }
+
+    document.querySelectorAll('.server-copy-btn').forEach(function (btn) {
+      rebuildCopySource(btn.dataset.shift);
+    });
+
+    // Cash-sales numbers/amounts don't change with any resolve widget on
+    // this page (unlike the tip-pool copy source), so this only needs to
+    // run once at load -- each shift's two textareas stay in the same row
+    // order so pasting "numbers" into the sheet's Number column and
+    // "cash" into its Cash column line up person-for-person.
+    ['AM', 'PM'].forEach(function (shift) {
+      var included = serverRows.filter(function (r) { return r.shift === shift && r.cashSalesNumber && r.cashSales; });
+      var numEl = document.getElementById('copy-cashnum-' + shift.toLowerCase());
+      var amtEl = document.getElementById('copy-cashamt-' + shift.toLowerCase());
+      if (numEl) numEl.value = included.length ? included.map(function (r) { return r.cashSalesNumber; }).join('\n') + '\n' : '';
+      if (amtEl) amtEl.value = included.length ? included.map(function (r) { return fmtWhole(r.cashSales); }).join('\n') + '\n' : '';
+      document.querySelectorAll('.cash-sales-copy-btn[data-shift="' + shift + '"] .copy-count')
+        .forEach(function (span) { span.textContent = included.length; });
+    });
+
+    document.querySelectorAll('.gratuity-resolve').forEach(function (widget) {
+      var rowId = parseInt(widget.dataset.rowId, 10);
+      var shift = widget.dataset.shift;
+      var row = serverRows.filter(function (r) { return r.id === rowId; })[0];
+      if (!row) return;
+      var toggleLink = widget.querySelector('.gratuity-toggle');
+      var manualBox = widget.querySelector('.gratuity-manual-inputs');
+      var resolvedNote = widget.querySelector('.gratuity-resolved-note');
+      var serverInput = manualBox.querySelector('.manual-server-share');
+      var bartenderInput = manualBox.querySelector('.manual-bartender-share');
+      var cancelBtn = manualBox.querySelector('.gratuity-cancel-btn');
+      var creditCell = document.getElementById('credit-' + rowId);
+      var bartenderCell = document.getElementById('bartender-credit-' + shift);
+
+      // The backend already added the full gratuity to this server's
+      // credit by default -- appliedServer starts there (not 0), so a
+      // manual split is always computed as a delta off "the whole thing
+      // is currently the server's," never double-counted.
+      row.appliedServer = row.largeGratuity;
+      row.appliedBartender = 0;
+
+      function applyAmounts(serverAmt, bartenderAmt) {
+        row.credit += serverAmt - row.appliedServer;
+        row.appliedServer = serverAmt;
+        creditCell.textContent = fmt2(row.credit);
+        if (bartenderCell && bartenderPools[shift]) {
+          bartenderPools[shift].credit += bartenderAmt - row.appliedBartender;
+          bartenderCell.textContent = fmt2(bartenderPools[shift].credit);
+        }
+        row.appliedBartender = bartenderAmt;
+      }
+
+      function showDefault() {
+        applyAmounts(row.largeGratuity, 0);
+        toggleLink.style.display = '';
+        manualBox.style.display = 'none';
+        resolvedNote.style.display = 'none';
+        rebuildCopySource(shift);
+      }
+
+      function markResolved(text) {
+        toggleLink.style.display = 'none';
+        manualBox.style.display = 'none';
+        resolvedNote.style.display = 'block';
+        resolvedNote.innerHTML = '';
+        resolvedNote.appendChild(document.createTextNode(text + ' '));
+        var changeLink = document.createElement('a');
+        changeLink.href = '#';
+        changeLink.textContent = 'Change';
+        changeLink.style.color = 'var(--accent)';
+        changeLink.addEventListener('click', function (e) {
+          e.preventDefault();
+          showDefault();
+        });
+        resolvedNote.appendChild(changeLink);
+        rebuildCopySource(shift);
+      }
+
+      toggleLink.addEventListener('click', function (e) {
+        e.preventDefault();
+        toggleLink.style.display = 'none';
+        manualBox.style.display = 'block';
+        serverInput.value = row.appliedServer || '';
+        bartenderInput.value = row.appliedBartender || '';
+      });
+
+      cancelBtn.addEventListener('click', function () {
+        manualBox.style.display = 'none';
+        toggleLink.style.display = '';
+      });
+
+      manualBox.querySelector('.apply-manual-btn').addEventListener('click', function () {
+        var serverShare = parseFloat(serverInput.value) || 0;
+        var bartenderShare = parseFloat(bartenderInput.value) || 0;
+        applyAmounts(serverShare, bartenderShare);
+        var note = row.name + ': $' + fmt2(serverShare) + ' — bartenders (' + shift + '): $' + fmt2(bartenderShare) + '.';
+        if (Math.abs((serverShare + bartenderShare) - row.largeGratuity) > 0.01) {
+          note += ' Doesn\'t add up to the $' + fmt2(row.largeGratuity) + ' gratuity — double check.';
+        }
+        markResolved(note);
+      });
+    });
+
+    document.querySelectorAll('.under4h-resolve').forEach(function (widget) {
+      var rowId = parseInt(widget.dataset.rowId, 10);
+      var shift = widget.dataset.shift;
+      var row = serverRows.filter(function (r) { return r.id === rowId; })[0];
+      if (!row) return;
+      var addBtn = widget.querySelector('[data-action="add"]');
+      var resolvedNote = widget.querySelector('.under4h-resolved-note');
+
+      function showButton() {
+        row.excluded = true;
+        addBtn.style.display = '';
+        resolvedNote.style.display = 'none';
+        rebuildCopySource(shift);
+      }
+
+      function markResolved() {
+        row.excluded = false;
+        addBtn.style.display = 'none';
+        resolvedNote.style.display = 'block';
+        resolvedNote.innerHTML = '';
+        resolvedNote.appendChild(document.createTextNode('Added to the sheet despite being under 4h. '));
+        var changeLink = document.createElement('a');
+        changeLink.href = '#';
+        changeLink.textContent = 'Change';
+        changeLink.style.color = 'var(--accent)';
+        changeLink.addEventListener('click', function (e) {
+          e.preventDefault();
+          showButton();
+        });
+        resolvedNote.appendChild(changeLink);
+        rebuildCopySource(shift);
+      }
+
+      addBtn.addEventListener('click', markResolved);
+    });
+
+    var supportRows = {{ result.support_staff_rows_json|safe if result.get('support_staff_rows_json') else '[]' }};
+
+    var SUPPORT_ROLES = ['Busser', 'Runner', 'Barista', 'Barback'];
+
+    function isSupportRowIncluded(r) {
+      if (r.cutByManager || r.isTerminated) return false;
+      return (!r.isOnCall && !r.isHouseShift && !r.isTrainee) || r.confirmed === 'worked';
+    }
+
+    // The same person can get two raw HotSchedules entries for one
+    // shift -- a real scheduled shift plus an on-call/House-Shift pickup
+    // (e.g. patio setup), sometimes even filed under a different role
+    // section. Only one should ever reach the pastable sheet. Computed
+    // globally across all four roles (not per-role) since confirming one
+    // role's row can change who wins in a completely different role's
+    // list -- a real scheduled entry always wins over an on-call/House
+    // Shift one; between two of the same kind, whichever this function
+    // hits first wins (stable, since supportRows' order never changes).
+    function computeSupportWinners() {
+      var winners = {};
+      supportRows.forEach(function (r) {
+        if (!isSupportRowIncluded(r)) return;
+        var key = r.shift + ' ' + r.name;
+        var current = winners[key];
+        if (!current) { winners[key] = r; return; }
+        var currentUncertain = current.isOnCall || current.isHouseShift;
+        var rUncertain = r.isOnCall || r.isHouseShift;
+        if (currentUncertain && !rUncertain) winners[key] = r;
+      });
+      return winners;
+    }
+
+    function isSupportRowFinal(r, winners) {
+      if (!isSupportRowIncluded(r)) return false;
+      var winner = winners[r.shift + ' ' + r.name];
+      return !!winner && winner.id === r.id;
+    }
+
+    // The ticket-tag count at the top of each role's ticket ("N on
+    // tonight's sheet") used to render once, server-side, as a static
+    // "how many were scheduled" total that never changed no matter how
+    // many on-call prompts got answered -- the only thing that DID move
+    // was the per-shift copy-button count further down, which is easy to
+    // miss. This recomputes the top-of-ticket count across both shifts
+    // every time any on-call row for that role changes.
+    function updateRoleIncludedCount(role, winners) {
+      var el = document.getElementById('role-included-' + role.toLowerCase());
+      if (!el) return;
+      var included = supportRows.filter(function (r) {
+        return r.role === role && isSupportRowFinal(r, winners);
+      });
+      el.textContent = included.length;
+    }
+
+    function rebuildSupportCopySource(role, shift, winners) {
+      var el = document.getElementById('copy-' + role.toLowerCase() + '-' + shift.toLowerCase());
+      if (el) {
+        var included = supportRows.filter(function (r) {
+          return r.role === role && r.shift === shift && isSupportRowFinal(r, winners);
+        });
+        el.value = included.length ? included.map(function (r) { return r.name; }).join('\n') + '\n' : '';
+        document.querySelectorAll('.support-copy-btn[data-role="' + role + '"][data-shift="' + shift + '"] .copy-count')
+          .forEach(function (span) { span.textContent = included.length; });
+      }
+      updateRoleIncludedCount(role, winners);
+    }
+
+    // A single row's confirm state can change who wins the dedupe in any
+    // other role's list for that shift, so every role+shift copy source
+    // is always rebuilt together, never just the one that changed.
+    function rebuildAllSupportCopySources() {
+      var winners = computeSupportWinners();
+      SUPPORT_ROLES.forEach(function (role) {
+        ['AM', 'PM'].forEach(function (shift) {
+          rebuildSupportCopySource(role, shift, winners);
+        });
+      });
+    }
+
+    rebuildAllSupportCopySources();
+
+    document.querySelectorAll('.oncall-resolve').forEach(function (widget) {
+      var rowId = parseInt(widget.dataset.rowId, 10);
+      var row = supportRows.filter(function (r) { return r.id === rowId; })[0];
+      if (!row) return;
+      var workedBtn = widget.querySelector('[data-action="worked"]');
+      var notWorkedBtn = widget.querySelector('[data-action="not-worked"]');
+      var resolvedNote = widget.querySelector('.oncall-resolved-note');
+
+      function showChoices() {
+        row.confirmed = null;
+        workedBtn.style.display = '';
+        notWorkedBtn.style.display = '';
+        resolvedNote.style.display = 'none';
+        rebuildAllSupportCopySources();
+      }
+
+      function markResolved(state, text) {
+        row.confirmed = state;
+        workedBtn.style.display = 'none';
+        notWorkedBtn.style.display = 'none';
+        resolvedNote.style.display = 'block';
+        resolvedNote.innerHTML = '';
+        resolvedNote.appendChild(document.createTextNode(text + ' '));
+        var changeLink = document.createElement('a');
+        changeLink.href = '#';
+        changeLink.textContent = 'Change';
+        changeLink.style.color = 'var(--accent)';
+        changeLink.addEventListener('click', function (e) {
+          e.preventDefault();
+          showChoices();
+        });
+        resolvedNote.appendChild(changeLink);
+        rebuildAllSupportCopySources();
+      }
+
+      workedBtn.addEventListener('click', function () {
+        var text = 'Confirmed: ' + row.name + ' worked -- added to the sheet.';
+        if (row.hasAdpPunch === false) {
+          text += ' Warning: there was no ADP punch in for this employee.';
+        }
+        markResolved('worked', text);
+      });
+
+      notWorkedBtn.addEventListener('click', function () {
+        var text = 'Confirmed: ' + row.name + ' did not work -- left off the sheet.';
+        if (row.hasAdpPunch === true) {
+          text += ' Warning: employee was selected as not called in, but has an ADP punch in.';
+        }
+        markResolved('not-worked', text);
+      });
+    });
+
+    function legacyCopy(source) {
+      source.style.position = 'fixed';
+      source.style.left = '0';
+      source.style.top = '0';
+      source.style.opacity = '0';
+      source.focus();
+      source.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      source.style.position = '';
+      source.style.left = '-9999px';
+      source.style.top = '';
+      return ok;
+    }
+
+    document.querySelectorAll('.copy-btn[data-source]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var source = document.getElementById(btn.dataset.source);
+        if (!source) return;
+        var original = btn.textContent;
+        function showResult(ok) {
+          btn.textContent = ok ? 'Copied ✓' : 'Copy failed -- select text below manually';
+          btn.classList.add(ok ? 'copied' : 'copy-failed');
+          if (!ok) {
+            source.style.position = 'static';
+            source.style.left = 'auto';
+            source.style.opacity = '1';
+            source.style.height = '120px';
+            source.style.width = '100%';
+            source.style.display = 'block';
+            source.style.margin = '0 20px 12px';
+            source.select();
+          }
+          setTimeout(function () {
+            btn.textContent = original;
+            btn.classList.remove('copied', 'copy-failed');
+          }, ok ? 1500 : 4000);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(source.value).then(
+            function () { showResult(true); },
+            function () { showResult(legacyCopy(source)); }
+          );
+        } else {
+          showResult(legacyCopy(source));
+        }
+      });
+    });
+  </script>
+  {% if not error and not result.get('clock_review_missing_date') %}
+  <script src="/static/file_cache.js?v={{ asset_version }}"></script>
+  <script>AvraFileCache.clear('daily_close', ['toast_csv', 'hotschedules_daily']);</script>
+  <script src="/static/results_cache.js?v={{ asset_version }}"></script>
+  <script>AvraResultsCache.initResultsPage('daily_close');</script>
+  {% endif %}
+</body>
+</html>

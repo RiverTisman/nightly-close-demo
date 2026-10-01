@@ -1,0 +1,28 @@
+{% set csv_labels = {
+  "Revenue center summary.csv": "Revenue Center",
+  "Service Daypart summary.csv": "Service Daypart",
+  "Net sales summary.csv": "Net Sales",
+  "Service mode summary.csv": "Service Mode",
+  "Menu Item Discounts.csv": "Menu Item Discounts",
+  "Check Discounts.csv": "Check Discounts",
+  "Void summary.csv": "Voids",
+  "Service charge summary.csv": "Service Charges",
+  "Cash summary.csv": "Cash",
+  "Payments summary.csv": "Payments",
+  "Tip summary.csv": "Tips",
+  "Dining options summary.csv": "Dining Options",
+} %}
+{% for fname, label in csv_labels.items() %}
+{% set rows = raw.get(fname) %}
+{% if rows %}
+<h3 class="section-label">{{ label }}</h3>
+<table class="data-table">
+  <thead><tr>{% for col in rows[0].keys() %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>{% for val in row.values() %}<td>{{ val }}</td>{% endfor %}</tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endfor %}

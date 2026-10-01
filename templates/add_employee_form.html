@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add Employee &mdash; Nightly Close</title>
+<link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+<style>
+  .field-row { display:flex; gap:12px; flex-wrap:wrap; }
+  .field-row > * { flex:1 1 200px; }
+  .text-input, .select-input {
+    width:100%; padding:12px 14px; border:1.5px solid var(--field-border);
+    border-radius:10px; background:#fff; font-size:16px;
+  }
+  .mono { font-family:monospace; }
+  .exact-value {
+    font-family:monospace; background:var(--chip-bg, #f2efe7); padding:2px 6px;
+    border-radius:5px; white-space:pre-wrap;
+  }
+  .fix-card {
+    border:1px solid var(--card-border); border-radius:12px;
+    padding:14px 16px; margin:0 20px 12px;
+  }
+  .fix-card h4 { margin:0 0 4px; font-size:16px; }
+  .fix-card .fine-print { margin:0 0 10px; display:block; }
+  .inline-form { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .inline-form > * { flex:1 1 180px; }
+  .inline-form button { flex:0 0 auto; }
+  .small-button {
+    padding:10px 16px; border-radius:9px; border:1.5px solid var(--accent, #7a6a4f);
+    background:var(--accent, #7a6a4f); color:#fff; font-size:15px; cursor:pointer;
+  }
+  .small-button.secondary { background:transparent; color:var(--body-text); }
+  .banner { margin:0 0 18px; padding:14px 18px; border-radius:12px; font-size:15px; }
+  .banner-warn { background:var(--flag-bg); color:var(--flag-text); }
+  .banner-ok { background:#eef7ee; color:var(--body-text); }
+  .counts { font-size:14px; color:var(--muted); margin:0 20px 12px; }
+</style>
+</head>
+<body>
+  {% include "_nav.html" %}
+  <div class="ticket-rail">
+    <header class="masthead">
+      <span class="masthead-mark">employee_mapping.json &middot; WEEKLY TOTALS</span>
+      <h1>Add Employee</h1>
+      <p class="subtitle">
+        Drop in the real Tip Sheet workbook and a HotSchedules roster. Everything that has to
+        match those files exactly is then taken from them, or written into them &mdash; never
+        typed twice.
+      </p>
+    </header>
+
+    {# ------------------------------------------------------------------ #}
+    {# Durability. A change that silently expires is worse than no change. #}
+    {# ------------------------------------------------------------------ #}
+    {% if not sync_status.configured %}
+    <div class="banner banner-warn">
+      <strong>Changes here are temporary right now.</strong>
+      {{ sync_status.detail }}
+      {% if sync_status.diagnosis %}
+      <p style="margin:10px 0 0;"><strong>What's actually wrong:</strong> {{ sync_status.diagnosis }}</p>
+      {% endif %}
+      {% if sync_status.deployment.on_render %}
+      <p class="fine-print" style="margin:8px 0 0;">
+        Running commit <code>{{ sync_status.deployment.commit or 'unknown' }}</code>
+        on <code>{{ sync_status.deployment.service or 'this service' }}</code>. If that isn't the
+        newest commit on GitHub, Render hasn't picked up the latest build yet.
+      </p>
+      {% endif %}
+    </div>
+    {% elif sync_status.ok is false %}
+    <div class="banner banner-warn">
+      <strong>Saves are NOT being kept.</strong> {{ sync_status.detail }}
+    </div>
+    {% else %}
+    <div class="banner banner-ok">
+      <strong>Saves are permanent.</strong> {{ sync_status.detail }}
+    </div>
+    {% endif %}
+
+    {% if outcome %}
+    <div class="ticket {% if not outcome.ok %}ticket-error{% endif %}">
+      <div class="ticket-header"><span class="ticket-title">{{ outcome.title }}</span></div>
+      {% if outcome.detail %}<p class="empty-note">{{ outcome.detail }}</p>{% endif %}
+      {% if outcome.errors %}
+      <ul class="flag-list">{% for e in outcome.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if outcome.sync and outcome.sync.detail %}
+      <p class="fine-print" style="margin:8px 20px 0;">
+        {% if outcome.sync.ok %}Saved permanently &mdash; {% elif outcome.sync.ok is none %}{% else %}<strong>Not saved permanently</strong> &mdash; {% endif %}{{ outcome.sync.detail }}
+      </p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if download %}
+    <form action="/add-employee/download" method="post" class="ticket">
+      <div class="ticket-header"><span class="ticket-title">Updated Tip Sheet</span></div>
+      <p class="empty-note">
+        This is your uploaded workbook with the new row written in &mdash; same file, same
+        formulas, same dropdowns, one more person. Save it over the copy you actually use.
+      </p>
+      <input type="hidden" name="workbook_b64" value="{{ download.b64 }}">
+      <input type="hidden" name="filename" value="{{ download.filename }}">
+      <button type="submit" class="fire-button">Download {{ download.filename }}</button>
+    </form>
+    {% endif %}
+
+    {# ------------------------------------------------------------------ #}
+    {# Step 1: the two real files.                                        #}
+    {# ------------------------------------------------------------------ #}
+    <form action="/add-employee/review" method="post" enctype="multipart/form-data" class="ticket" data-carry-files>
+      <div class="ticket-header">
+        <span class="ticket-no">01</span>
+        <span class="ticket-title">Load the real files</span>
+      </div>
+
+      <label class="dropzone">
+        <input type="file" name="tip_sheet_workbook" accept=".xlsx,.xlsm">
+        <span class="dropzone-label">
+          {% if review.has_workbook %}Loaded: {{ workbook_name or 'Tip Sheet workbook' }} &mdash; drop a different one to replace it
+          {% else %}Master Tip Sheet workbook (.xlsx) &mdash; the one with the WEEKLY TOTALS tab{% endif %}
+        </span>
+        <span class="dropzone-ext">xlsx</span>
+      </label>
+
+      <label class="dropzone">
+        <input type="file" name="hotschedules_roster" accept=".csv,.xls,.xml">
+        <span class="dropzone-label">
+          {% if review.has_roster %}Loaded: {{ roster_name or 'HotSchedules roster' }} &mdash; drop a different one to replace it
+          {% else %}HotSchedules roster &mdash; the Weekly Roster CSV, or a daily Roster Report (Excel XP-2007){% endif %}
+        </span>
+        <span class="dropzone-ext">csv / xls</span>
+      </label>
+
+      <button type="submit" class="fire-button">
+        {% if review.has_workbook or review.has_roster %}Re-check against these files{% else %}Check the mapping against these files{% endif %}
+      </button>
+      <p class="fine-print" style="margin:10px 20px 0;">
+        The workbook is what makes a new name exact &mdash; the app reads its dropdown ranges and
+        writes into them directly. The roster is where a person's HotSchedules spelling is picked
+        from, so an alias is never typed from memory.
+      </p>
+    </form>
+
+    {% if review.errors %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header"><span class="ticket-title">Couldn't read a file</span></div>
+      <ul class="flag-list">{% for e in review.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    {# ------------------------------------------------------------------ #}
+    {# Workbook structure problems -- wrong-row SUMIFs.                    #}
+    {# ------------------------------------------------------------------ #}
+    {% if review.formula_audit %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header">
+        <span class="ticket-title">This workbook's own formulas point at the wrong rows</span>
+        <span class="ticket-tag">{{ review.formula_audit | length }} rows</span>
+      </div>
+      <p class="empty-note">
+        These WEEKLY TOTALS rows add up a <em>different</em> row's name than the one printed on
+        them. It's the workbook's own formulas rather than the mapping, so the dropdown check
+        can't see it &mdash; but the effect is the same as a name mismatch: money totals against
+        the wrong person, silently. A row with a name in it is getting the wrong numbers right
+        now; an empty one is a trap for whoever lands there next.
+      </p>
+      <table class="data-table">
+        <thead><tr><th>Role</th><th>Row</th><th>Name in that row</th><th>Its formulas total up row</th></tr></thead>
+        <tbody>
+        {% for f in review.formula_audit %}
+          <tr>
+            <td>{{ f.role }}</td>
+            <td>{{ f.row }}</td>
+            <td>{% if f.name %}<span class="exact-value">{{ f.name }}</span>{% else %}<span class="fine-print">(empty slot)</span>{% endif %}</td>
+            <td>{{ f.refs | join(', ') }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <p class="fine-print" style="margin:10px 20px 12px;">
+        Repairing re-points each row's SUMIF at its own name and nothing else &mdash; the lookup
+        and sum ranges are left exactly as they are, and no name, EID or dropdown is touched.
+        Excel recalculates the whole book on open, since the numbers cached in the file were
+        computed from the wrong formulas. Empty slots listed here are refused as landing spots
+        for a new employee until this is done.
+      </p>
+      <form action="/add-employee/apply" method="post" data-carry-files style="margin:0 20px 4px;">
+        <input type="hidden" name="action" value="repair_workbook">
+        <button type="submit" class="small-button">Repair these {{ review.formula_audit | length }} rows and give me the file</button>
+      </form>
+    </div>
+    {% endif %}
+
+    {# ------------------------------------------------------------------ #}
+    {# In the workbook, missing from the mapping.                         #}
+    {# ------------------------------------------------------------------ #}
+    {% if review.workbook_unmapped %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-title">In the Tip Sheet, missing from the mapping</span>
+        <span class="ticket-tag">{{ review.workbook_unmapped | length }}</span>
+      </div>
+      <p class="empty-note">
+        These people already have a row in WEEKLY TOTALS, so the workbook is fine &mdash; the app
+        just can't see them, which is why they come up "unmatched" on every close. Adding them
+        here copies the sheet's exact cell text into the mapping. Nothing in the workbook changes.
+      </p>
+      {% for w in review.workbook_unmapped %}
+      <div class="fix-card">
+        <h4>{{ w.names[0] }}</h4>
+        <span class="fine-print">
+          EID {{ w.eid }} &middot; {{ w.roles | join(', ') }} &middot; row{{ 's' if w.rows|length > 1 }}
+          {{ w.rows | join(', ') }} &middot; Tip Sheet text <span class="exact-value">{{ w.names[0] }}</span>
+        </span>
+        <form action="/add-employee/apply" method="post" data-carry-files>
+          <input type="hidden" name="action" value="map_existing">
+          <input type="hidden" name="eid" value="{{ w.eid }}">
+          <input type="hidden" name="tip_sheet" value="{{ w.names[0] }}">
+          <div class="inline-form">
+            <label>
+              <span class="date-field-label">Display name for this app</span>
+              <input type="text" class="text-input" name="canonical" required
+                     value="{{ w.suggested_canonical or '' }}" placeholder="e.g. Jordan Avery">
+            </label>
+            <label>
+              <span class="date-field-label">HotSchedules name</span>
+              <select class="select-input" name="hotschedules_names">
+                <option value="">-- pick from the roster --</option>
+                {% for r in review.roster_names %}
+                <option value="{{ r.name }}">{{ r.name }}{% if r.jobs %} ({{ r.jobs | join('/') }}){% endif %}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span class="date-field-label">Cash sales number</span>
+              <input type="text" class="text-input" name="cash_sales_number" placeholder="e.g. 1034 -- Servers only">
+            </label>
+            <button type="submit" class="small-button">Add to mapping</button>
+          </div>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ------------------------------------------------------------------ #}
+    {# Mapped, in the sheet, but the two strings differ. The quiet one.    #}
+    {# ------------------------------------------------------------------ #}
+    {% if review.drift %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header">
+        <span class="ticket-title">Mapped name doesn't match the workbook</span>
+        <span class="ticket-tag">{{ review.drift | length }}</span>
+      </div>
+      <p class="empty-note">
+        Same EID, two different spellings. The pasted name won't register as a dropdown selection,
+        and the sheet's SUMIF returns $0 for that person's whole share &mdash; with no error
+        anywhere. Fixing this repoints the mapping at the sheet's exact text.
+      </p>
+      {% for d in review.drift %}
+      <div class="fix-card">
+        <h4>{{ d.canonical }}</h4>
+        <span class="fine-print">
+          EID {{ d.eid }} &middot; mapping says <span class="exact-value">{{ d.mapped }}</span>
+          &middot; workbook says <span class="exact-value">{{ d.real }}</span>
+        </span>
+        <form action="/add-employee/apply" method="post" data-carry-files>
+          <input type="hidden" name="action" value="fix_drift">
+          <input type="hidden" name="canonical" value="{{ d.canonical }}">
+          <input type="hidden" name="tip_sheet" value="{{ d.real }}">
+          <button type="submit" class="small-button">Use the workbook's text</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ------------------------------------------------------------------ #}
+    {# Scheduled in HotSchedules, matching nothing.                        #}
+    {# ------------------------------------------------------------------ #}
+    {% if review.roster_unmatched %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-title">On the schedule, matching no one in the mapping</span>
+        <span class="ticket-tag">{{ review.roster_unmatched | length }}</span>
+      </div>
+      <p class="empty-note">
+        Every one of these shows up as "unmatched" on Daily Close. Usually it's one of two things:
+        a genuinely new person (add them from the section above, or write them into the Tip Sheet
+        below), or someone already mapped whose HotSchedules spelling we've never stored &mdash;
+        a nickname, a middle initial, or a typo in the alias we saved.
+      </p>
+      {% for r in review.roster_unmatched %}
+      <div class="fix-card">
+        <h4><span class="exact-value">{{ r.name }}</span></h4>
+        <span class="fine-print">
+          Scheduled as {{ r.jobs | join(', ') if r.jobs else 'no job listed' }}.
+          {% if r.candidates and r.candidates[0].similarity >= 0.8 %}
+          Closest unmapped Tip Sheet row: <span class="exact-value">{{ r.candidates[0].name }}</span>
+          (EID {{ r.candidates[0].eid }}) &mdash; if that's them, add them from the section above first.
+          {% endif %}
+        </span>
+        <form action="/add-employee/apply" method="post" data-carry-files>
+          <input type="hidden" name="action" value="add_alias">
+          <input type="hidden" name="alias" value="{{ r.name }}">
+          <input type="hidden" name="alias_system" value="hotschedules">
+          <div class="inline-form">
+            <label>
+              <span class="date-field-label">This is an existing employee</span>
+              <select class="select-input" name="canonical" required>
+                <option value="">-- who is this? --</option>
+                {% if r.existing_candidates %}
+                <optgroup label="Closest matches">
+                  {% for c in r.existing_candidates %}
+                  <option value="{{ c.name }}">{{ c.name }}{% if c.eid %} (EID {{ c.eid }}){% endif %}</option>
+                  {% endfor %}
+                </optgroup>
+                {% endif %}
+                <optgroup label="Everyone in the mapping">
+                  {% for e in all_employees %}
+                  <option value="{{ e.canonical }}">{{ e.canonical }}{% if e.eid %} (EID {{ e.eid }}){% endif %}</option>
+                  {% endfor %}
+                </optgroup>
+              </select>
+            </label>
+            <button type="submit" class="small-button">Save this spelling for them</button>
+          </div>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ------------------------------------------------------------------ #}
+    {# Step 2: someone genuinely new -- written INTO the workbook.         #}
+    {# ------------------------------------------------------------------ #}
+    <form action="/add-employee/apply" method="post" class="ticket" id="new-person-form" data-carry-files>
+      <div class="ticket-header">
+        <span class="ticket-no">02</span>
+        <span class="ticket-title">Add someone who isn't in the Tip Sheet yet</span>
+      </div>
+      <p class="empty-note">
+        Type their name once. The app writes it into WEEKLY TOTALS itself and stores that exact
+        same text in the mapping, then hands you back the workbook to save. Because both sides
+        come from one string, they can't disagree &mdash; whatever spelling you confirm below
+        <em>becomes</em> the correct one.
+      </p>
+      <input type="hidden" name="action" value="create_in_workbook">
+
+      {% if not review.has_workbook %}
+      <div class="banner banner-warn" style="margin:0 20px 14px;">
+        <strong>Load the Tip Sheet workbook in step 01 first.</strong>
+        This section writes the new person straight into WEEKLY TOTALS, so without the workbook
+        there's nothing to write into &mdash; and a mapping entry on its own is the half-done
+        state that breaks the sheet. Fill this in once the workbook is loaded.
+      </div>
+      {% endif %}
+
+      <div class="field-row" style="margin:0 20px 12px;">
+        <label>
+          <span class="date-field-label">Their name</span>
+          <input type="text" class="text-input" name="canonical" id="new-name"
+                 placeholder="e.g. Jordan Avery">
+        </label>
+        <label>
+          <span class="date-field-label">Role on the Tip Sheet</span>
+          <select class="select-input" name="role" id="new-role">
+            {% for role in review.role_order %}
+            {% set s = review.sections.get(role) %}
+            <option value="{{ role }}" {% if s and s.free_count == 0 %}disabled{% endif %}>
+              {{ role }}{% if s %} &mdash; {{ s.free_count }} free row{{ 's' if s.free_count != 1 }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span class="date-field-label">EID</span>
+          <input type="text" class="text-input" name="eid" placeholder="e.g. 200123"
+                >
+        </label>
+      </div>
+
+      <label class="date-field" style="background:#faf8f2;">
+        <span class="date-field-label">Exact text to write into the Tip Sheet</span>
+        <input type="text" class="text-input mono" name="tip_sheet" id="new-tip-sheet"
+               placeholder="e.g. AVERY, JORDAN -- fills in as you type the name">
+        <span class="fine-print">
+          This one string goes into the workbook cell <em>and</em> into the mapping. Edit it to
+          whatever the sheet should say &mdash; you're setting the convention here, not guessing
+          at an existing one.
+        </span>
+      </label>
+
+      <div class="field-row" style="margin:0 20px 12px;">
+        <label>
+          <span class="date-field-label">HotSchedules name</span>
+          <select class="select-input" name="hotschedules_names">
+            <option value="">-- pick from the roster --</option>
+            {% for r in review.roster_names %}
+            <option value="{{ r.name }}">{{ r.name }}{% if r.jobs %} ({{ r.jobs | join('/') }}){% endif %}</option>
+            {% endfor %}
+          </select>
+          <span class="fine-print">Only names from the uploaded roster, so it matches on the next close.</span>
+        </label>
+        <label>
+          <span class="date-field-label">Cash sales number</span>
+          <input type="text" class="text-input" name="cash_sales_number" placeholder="e.g. 1034 -- Servers only"
+                >
+        </label>
+      </div>
+
+      <label class="date-field">
+        <span class="date-field-label">Toast name(s)</span>
+        <textarea name="toast_names" rows="2" class="text-input" placeholder="One per line. Leave blank for Busser/Runner/Barista/Barback -- Toast never logs those."
+                 ></textarea>
+      </label>
+
+      <button type="submit" class="fire-button">
+        Write into the Tip Sheet and map
+      </button>
+    </form>
+
+    {% if review.has_workbook %}
+    <p class="counts">
+      Free rows per section:
+      {% for role in review.role_order %}{% set s = review.sections.get(role) %}{% if s %}{{ role }} {{ s.free_count }}{% if s.blocked_count %} ({{ s.blocked_count }} blocked){% endif %}{{ ' &middot; ' | safe if not loop.last }}{% endif %}{% endfor %}
+    </p>
+    {% endif %}
+
+    {# ------------------------------------------------------------------ #}
+    {# Left in the mapping, gone from the sheet.                          #}
+    {# ------------------------------------------------------------------ #}
+    {% if review.mapping_not_in_workbook %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-title">Active in the mapping, not in this workbook</span>
+        <span class="ticket-tag">{{ review.mapping_not_in_workbook | length }}</span>
+      </div>
+      <p class="empty-note">
+        Usually people who left and were never marked terminated. Harmless until one of them
+        turns up in an export, but worth clearing out &mdash; use the terminate picker below.
+      </p>
+      <ul class="flag-list" style="color:var(--body-text);">
+        {% for m in review.mapping_not_in_workbook %}
+        <li>{{ m.canonical }} <span class="fine-print">(EID {{ m.eid }} &middot; <span class="exact-value">{{ m.tip_sheet }}</span>)</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {# ------------------------------------------------------------------ #}
+    {# Long-standing forms: edit, and terminate/reactivate.                #}
+    {# ------------------------------------------------------------------ #}
+    {% if edit_result %}
+      {% if edit_result.updated %}
+      <div class="ticket">
+        <div class="ticket-header"><span class="ticket-title">Saved</span></div>
+        <p class="empty-note">{{ edit_result.canonical }} was updated.</p>
+        {% if edit_result.sync and edit_result.sync.detail %}<p class="fine-print" style="margin:8px 20px 0;">{{ edit_result.sync.detail }}</p>{% endif %}
+      </div>
+      {% else %}
+      <div class="ticket ticket-error">
+        <div class="ticket-header"><span class="ticket-title">Not saved</span></div>
+        <ul class="flag-list">{% for e in edit_result.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+    {% endif %}
+
+    <form action="/edit-employee" method="post" class="ticket" data-carry-files>
+      <div class="ticket-header"><span class="ticket-title">Edit an existing employee</span></div>
+      <p class="fine-print" style="margin:0 20px 12px;">
+        For anything the guided fixes above don't cover. Doesn't touch active/terminated status.
+      </p>
+      <div class="date-field"><div id="edit-picker"></div></div>
+
+      <div id="edit-fields" hidden>
+        <input type="hidden" name="original_canonical">
+        <label class="date-field">
+          <span class="date-field-label">Canonical name</span>
+          <input type="text" class="text-input" name="canonical">
+        </label>
+        <label class="date-field">
+          <span class="date-field-label">EID</span>
+          <input type="text" class="text-input" name="eid">
+        </label>
+        <label class="date-field" style="background:#faf8f2;">
+          <span class="date-field-label">Tip Sheet name &mdash; EXACT cell text</span>
+          <input type="text" class="text-input mono" name="tip_sheet">
+          <span class="fine-print">
+            Byte-for-byte identical to WEEKLY TOTALS column B, trailing spaces included. If a
+            workbook is loaded above, the drift check has already compared this for you.
+          </span>
+        </label>
+        <label class="date-field">
+          <span class="date-field-label">HotSchedules name(s)</span>
+          <textarea name="hotschedules_names" rows="2" class="text-input" placeholder="One per line."></textarea>
+        </label>
+        <label class="date-field">
+          <span class="date-field-label">Toast name(s)</span>
+          <textarea name="toast_names" rows="2" class="text-input" placeholder="One per line."></textarea>
+        </label>
+        <label class="date-field">
+          <span class="date-field-label">Cash sales number</span>
+          <input type="text" class="text-input" name="cash_sales_number" placeholder="Leave blank to clear it">
+        </label>
+        <button type="submit" class="fire-button">Save changes</button>
+      </div>
+    </form>
+
+    {% if status_result %}
+      {% if status_result.applied %}
+      <div class="ticket">
+        <div class="ticket-header"><span class="ticket-title">Status updated</span></div>
+        <ul class="flag-list" style="color:var(--body-text);">
+          {% for a in status_result.applied %}<li><strong>{{ a.canonical }}</strong> &mdash; {{ a.old_status }} &rarr; {{ a.new_status }}</li>{% endfor %}
+        </ul>
+        {% if status_result.sync and status_result.sync.detail %}<p class="fine-print" style="margin:8px 20px 0;">{{ status_result.sync.detail }}</p>{% endif %}
+      </div>
+      {% endif %}
+      {% if status_result.errors %}
+      <div class="ticket ticket-error">
+        <div class="ticket-header"><span class="ticket-title">Some updates didn't apply</span></div>
+        <ul class="flag-list">{% for e in status_result.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+    {% endif %}
+
+    <form action="/employee-status" method="post" class="ticket" data-carry-files>
+      <div class="ticket-header"><span class="ticket-title">Terminate or reactivate an employee</span></div>
+      <p class="fine-print" style="margin:0 20px 12px;">
+        A terminated employee stops getting asked about on-call/House Shift confirmations, and
+        stays flagged if they show up in any upload anyway. Search includes everyone, so a rehire
+        can be flipped back.
+      </p>
+      <div class="date-field"><div id="status-picker"></div></div>
+      <button type="submit" class="fire-button">Update status</button>
+    </form>
+  </div>
+
+  <!-- The two uploaded files, held once for the whole page.
+
+       They used to be repeated as hidden inputs inside every form that
+       needed to post them back, which made this page ~10MB: the workbook
+       is ~600KB once base64'd, and there are a dozen forms. Keeping one
+       copy and attaching it to whichever form is actually being
+       submitted keeps the page small while preserving the property that
+       matters -- the app holds no per-user state between requests, so
+       the workbook being edited is always demonstrably the one in front
+       of the manager, even across a redeploy mid-edit. -->
+  <div id="carried-files" hidden>
+    <input type="hidden" data-carry name="workbook_b64" value="{{ workbook_b64 }}">
+    <input type="hidden" data-carry name="roster_b64" value="{{ roster_b64 }}">
+    <input type="hidden" data-carry name="workbook_name" value="{{ workbook_name }}">
+    <input type="hidden" data-carry name="roster_name" value="{{ roster_name }}">
+  </div>
+
+  <script src="/static/staff_picker.js?v={{ asset_version }}"></script>
+  <script>
+    // Attach the carried files to whichever form is being submitted, at
+    // submit time rather than on load -- one materialized copy instead
+    // of one per form.
+    document.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!form.hasAttribute || !form.hasAttribute('data-carry-files')) return;
+      var store = document.getElementById('carried-files');
+      if (!store) return;
+      Array.prototype.forEach.call(store.querySelectorAll('[data-carry]'), function (src) {
+        if (form.querySelector('[name="' + src.name + '"]')) return;
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = src.name;
+        input.value = src.value;
+        form.appendChild(input);
+      });
+    }, true);
+
+    var avraAllEmployees = {{ all_employees_json|safe if all_employees_json else '[]' }};
+
+    // Suggest the "LAST, FIRST" text as the name is typed. Only ever a
+    // starting point -- the field stays editable, and whatever is in it
+    // on submit is what goes into BOTH the workbook and the mapping, so
+    // a wrong suggestion can't desynchronize the two.
+    (function () {
+      var nameEl = document.getElementById('new-name');
+      var roleEl = document.getElementById('new-role');
+      var outEl = document.getElementById('new-tip-sheet');
+      if (!nameEl || !outEl) return;
+      var edited = false;
+      outEl.addEventListener('input', function () { edited = true; });
+
+      function refresh() {
+        if (edited || !nameEl.value.trim()) return;
+        var body = new FormData();
+        body.append('full_name', nameEl.value);
+        body.append('role', roleEl ? roleEl.value : '');
+        body.append('workbook_b64', document.querySelector('#carried-files [name="workbook_b64"]').value);
+        fetch('/add-employee/preview-name', {method: 'POST', body: body})
+          .then(function (r) { return r.json(); })
+          .then(function (d) { if (!edited) outEl.value = d.tip_sheet || ''; })
+          .catch(function () { /* leave the field alone rather than clearing a typed value */ });
+      }
+      var timer = null;
+      function debounced() { clearTimeout(timer); timer = setTimeout(refresh, 250); }
+      nameEl.addEventListener('input', debounced);
+      if (roleEl) roleEl.addEventListener('change', debounced);
+    })();
+
+    function buildStatusOptions(entries) {
+      return entries.map(function (e) {
+        return {
+          canonical: e.canonical,
+          eid: e.eid,
+          status: e.status || 'active',
+          label: e.canonical + (e.status === 'terminated' ? ' (terminated)' : ''),
+        };
+      });
+    }
+
+    function populateEditForm(picked) {
+      var fields = document.getElementById('edit-fields');
+      if (!picked) { fields.hidden = true; return; }
+      var full = avraAllEmployees.filter(function (e) { return e.canonical === picked.canonical; })[0];
+      if (!full) { fields.hidden = true; return; }
+      fields.hidden = false;
+      fields.querySelector('[name="original_canonical"]').value = full.canonical;
+      fields.querySelector('[name="canonical"]').value = full.canonical;
+      fields.querySelector('[name="eid"]').value = full.eid || '';
+      fields.querySelector('[name="tip_sheet"]').value = full.tip_sheet || '';
+      fields.querySelector('[name="hotschedules_names"]').value = (full.hotschedules || []).join('\n');
+      fields.querySelector('[name="toast_names"]').value = (full.toast || []).join('\n');
+      fields.querySelector('[name="cash_sales_number"]').value = full.cash_sales_number || '';
+    }
+
+    function mountPickers() {
+      AvraStaffPicker.init(document.getElementById('status-picker'), buildStatusOptions(avraAllEmployees), {
+        hiddenInputName: 'status_updates_json',
+        placeholder: 'Type a name...',
+        labelKey: 'label',
+        valueKey: 'canonical',
+        extraField: {
+          key: 'status',
+          options: [
+            {value: 'terminated', label: 'Terminated'},
+            {value: 'active', label: 'Active'}
+          ]
+        }
+      });
+      AvraStaffPicker.init(document.getElementById('edit-picker'), avraAllEmployees.map(function (e) {
+        return {canonical: e.canonical, eid: e.eid};
+      }), {
+        hiddenInputName: '_edit_picker_selection',
+        placeholder: 'Type a name...',
+        maxSelected: 1,
+        onChange: function (selected) { populateEditForm(selected[0] || null); }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', mountPickers);
+
+    // A "back" navigation can restore this page from bfcache -- the exact
+    // JS state as it was, not a fresh request. If an employee was added
+    // elsewhere in the meantime, that stale snapshot is what the pickers
+    // would be built from. e.persisted is how a page tells a bfcache
+    // restore apart from a normal load.
+    window.addEventListener('pageshow', function (e) {
+      if (!e.persisted) return;
+      fetch('/api/employees').then(function (r) { return r.json(); }).then(function (entries) {
+        avraAllEmployees = entries;
+        mountPickers();
+      }).catch(function () { /* keep the working picker we already have */ });
+    });
+  </script>
+</body>
+</html>

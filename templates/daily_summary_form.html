@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nightly Close &mdash; Daily Summary</title>
+<script src="/static/results_cache.js?v={{ asset_version }}"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { AvraResultsCache.restore('daily_summary'); });</script>
+<link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+</head>
+<body>
+  {% include "_nav.html" %}
+  <div class="ticket-rail">
+    <header class="masthead">
+      <span class="masthead-mark">End-of-day recap</span>
+      <h1>Daily Summary</h1>
+      <p class="subtitle">Two Toast Sales Summary pulls &rarr; the lunch/dinner sales report layout.</p>
+    </header>
+
+    <div class="construction-tile">
+      <div class="icon">&#9875;</div>
+      <div class="eyebrow">Under construction</div>
+      <h2>Still in the galley</h2>
+      <p>The upload and layout below are real &mdash; nothing is silently computed yet. Every
+        cell on the results page stays a placeholder until Comps/Voids/Manager Meals sourcing
+        and a few other equations are confirmed cell-by-cell in a future session, and Covers
+        (with anything that depends on it, like Check avg.) is waiting on a Resy upload.</p>
+    </div>
+
+    <form action="/daily-summary" method="post" enctype="multipart/form-data" class="ticket">
+      <label class="date-field">
+        <span class="date-field-label">Date being summarized</span>
+        <input type="date" name="roster_date">
+        <span class="fine-print">Same calendar day for both pulls below.</span>
+      </label>
+
+      <div class="ticket-header">
+        <span class="ticket-no">01</span>
+        <span class="ticket-title">Toast Sales Summary &mdash; lunch cutoff pull</span>
+        <span class="ticket-tag">pulled ~4-5pm, the existing lunch/dinner cutoff</span>
+      </div>
+      <label class="dropzone">
+        <input type="file" name="toast_sales_lunch" accept=".zip" data-persist>
+        <span class="dropzone-label">Drop the lunch-cutoff Sales Summary .zip here, or click to browse</span>
+        <span class="dropzone-ext">.zip</span>
+      </label>
+
+      <div class="ticket-header">
+        <span class="ticket-no">02</span>
+        <span class="ticket-title">Toast Sales Summary &mdash; final/closing pull</span>
+        <span class="ticket-tag">pulled after everyone's clocked out</span>
+      </div>
+      <label class="dropzone">
+        <input type="file" name="toast_sales_final" accept=".zip" data-persist>
+        <span class="dropzone-label">Drop the final Sales Summary .zip here, or click to browse</span>
+        <span class="dropzone-ext">.zip</span>
+      </label>
+
+      <button type="submit" class="fire-button">Build the summary</button>
+    </form>
+  </div>
+  <script src="/static/file_cache.js?v={{ asset_version }}"></script>
+  <script src="/static/date_memory.js?v={{ asset_version }}"></script>
+  <script>
+    AvraFileCache.init('daily_summary');
+    AvraDateMemory.init();
+  </script>
+</body>
+</html>

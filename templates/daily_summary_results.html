@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Summary Results &mdash; Nightly Close</title>
+<link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+</head>
+<body>
+  {% include "_nav.html" %}
+  <div class="ticket-rail">
+    <header class="masthead masthead-compact">
+      <div>
+        <span class="masthead-mark">End-of-day recap</span>
+        <h1>Daily Summary results</h1>
+      </div>
+      <a href="/daily-summary" class="back-link">&larr; run another</a>
+    </header>
+
+    <p class="fine-print" style="margin:0 0 16px;">Still under construction &mdash; the upload and raw-data extraction are real, everything else below is a placeholder until a future session maps each cell's exact source.</p>
+
+    {% if error %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header"><span class="ticket-title">Something went wrong</span></div>
+      <pre class="raw-error">{{ error }}</pre>
+    </div>
+    {% endif %}
+
+    {% if result.get('open_items') %}
+    <div class="ticket ticket-error">
+      <div class="ticket-header">
+        <span class="ticket-title">Still needs mapping</span>
+        <span class="ticket-tag">nothing below marked "pending" is computed yet</span>
+      </div>
+      <ul class="flag-list" style="padding:0 20px 16px 38px;">
+        {% for item in result.open_items %}<li>{{ item }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if result.get('lunch_layout') %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-no">01</span>
+        <span class="ticket-title">Lunch sheet &mdash; target layout</span>
+        <span class="ticket-tag">Harbor &amp; Vine - Daily Lunch Sales Report</span>
+      </div>
+
+      <table class="summary-table">
+        <tr><td colspan="2" class="section-label" style="margin:0;">Daily Net Lunch Sales</td></tr>
+        <tr><td>2026</td><td class="num pending">pending</td></tr>
+      </table>
+
+      <h3 class="section-label">Week to Date <span class="section-hint">deferred &mdash; needs multi-day persistence</span></h3>
+      <table class="summary-table">
+        <tr><td>WTD Net Lunch Sales</td><td class="num pending">pending</td></tr>
+      </table>
+
+      <h3 class="section-label">Sales by Revenue Center <span class="section-hint">lunch = taken directly from the lunch-cutoff pull</span></h3>
+      <table class="data-table">
+        <thead><tr><th>Revenue Center</th><th>Sales</th><th>Covers</th></tr></thead>
+        <tbody>
+          {% for center in result.revenue_centers_in_order %}
+          <tr><td>{{ center }}</td><td class="num pending">pending</td><td class="num pending">shell &mdash; will come from Resy</td></tr>
+          {% endfor %}
+          <tr><td>Total</td><td class="num pending">pending</td><td class="num pending">shell &mdash; will come from Resy</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="section-label">Delivery</h3>
+      <table class="summary-table">
+        <tr><td>Lunch Delivery</td><td class="num pending">source unconfirmed</td></tr>
+      </table>
+
+      <h3 class="section-label">Comps / Voids / Manager Meals</h3>
+      <table class="summary-table">
+        <tr><td>Lunch Comps</td><td class="num pending">needs discount-line mapping</td></tr>
+        <tr><td>Lunch Voids</td><td class="num pending">pending</td></tr>
+        <tr><td>Manager Meals</td><td class="num pending">pending</td></tr>
+      </table>
+
+      <h3 class="section-label">Check avg. <span class="section-hint">Net Sales &divide; Covers &mdash; blocked until Resy is wired in</span></h3>
+      <table class="summary-table">
+        <tr><td>Dining Room</td><td class="num pending">pending</td></tr>
+        <tr><td>Bar</td><td class="num pending">pending</td></tr>
+        <tr><td>Events</td><td class="num pending">pending</td></tr>
+      </table>
+
+      <h3 class="section-label">Lunch Summary <span class="section-hint">always manager-written, never computed</span></h3>
+      <p class="empty-note">&mdash; manual entry &mdash;</p>
+
+      <h3 class="section-label">PIVs <span class="section-hint">always manager-written, never computed</span></h3>
+      <p class="empty-note">&mdash; manual entry &mdash;</p>
+    </div>
+    {% endif %}
+
+    {% if result.get('dinner_layout') %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-no">02</span>
+        <span class="ticket-title">Dinner sheet &mdash; target layout</span>
+        <span class="ticket-tag">Harbor &amp; Vine - Dinner Summary</span>
+      </div>
+      <table class="summary-table">
+        <tr><td colspan="2" class="section-label" style="margin:0;">Daily Net Sales</td></tr>
+        <tr><td>Lunch</td><td class="num pending">pending</td></tr>
+        <tr><td>Dinner</td><td class="num pending">pending</td></tr>
+        <tr><td>Total Net Sales</td><td class="num pending">pending</td></tr>
+      </table>
+
+      <h3 class="section-label">Week to Date <span class="section-hint">deferred &mdash; needs multi-day persistence</span></h3>
+      <table class="summary-table">
+        <tr><td>WTD Dinner Net Sales</td><td class="num pending">pending</td></tr>
+        <tr><td>WTD Total Net Sales</td><td class="num pending">pending</td></tr>
+      </table>
+
+      <h3 class="section-label">Sales by Revenue Center <span class="section-hint">dinner = final pull minus lunch pull, per center</span></h3>
+      <table class="data-table">
+        <thead><tr><th>Revenue Center</th><th>Sales</th><th>Covers</th></tr></thead>
+        <tbody>
+          {% for center in result.revenue_centers_in_order %}
+          <tr><td>{{ center }}</td><td class="num pending">pending</td><td class="num pending">shell &mdash; will come from Resy</td></tr>
+          {% endfor %}
+          <tr><td>Total</td><td class="num pending">pending</td><td class="num pending">shell &mdash; will come from Resy</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="section-label">Delivery</h3>
+      <table class="summary-table">
+        <tr><td>Lunch Delivery</td><td class="num pending">source unconfirmed</td></tr>
+        <tr><td>Dinner Delivery</td><td class="num pending">source unconfirmed</td></tr>
+        <tr><td>Total Delivery Sales</td><td class="num pending">source unconfirmed</td></tr>
+      </table>
+
+      <h3 class="section-label">Comps / Voids / Manager Meals</h3>
+      <table class="summary-table">
+        <tr><td>Dinner Comps</td><td class="num pending">needs discount-line mapping</td></tr>
+        <tr><td>Dinner Voids</td><td class="num pending">pending</td></tr>
+        <tr><td>Manager Meals</td><td class="num pending">pending</td></tr>
+      </table>
+
+      <h3 class="section-label">Check avg. <span class="section-hint">Net Sales &divide; Covers &mdash; blocked until Resy is wired in</span></h3>
+      <table class="summary-table">
+        <tr><td>Dinner Dining Room</td><td class="num pending">pending</td></tr>
+        <tr><td>Dinner Bar</td><td class="num pending">pending</td></tr>
+        <tr><td>Dinner Events</td><td class="num pending">pending</td></tr>
+        <tr><td>Lunch Dining Room</td><td class="num pending">pending</td></tr>
+        <tr><td>Lunch Bar</td><td class="num pending">pending</td></tr>
+        <tr><td>Lunch Events</td><td class="num pending">pending</td></tr>
+      </table>
+
+      <h3 class="section-label">Dinner Overview <span class="section-hint">always manager-written, never computed</span></h3>
+      <p class="empty-note">&mdash; manual entry &mdash;</p>
+
+      <h3 class="section-label">PIVs <span class="section-hint">always manager-written, never computed</span></h3>
+      <p class="empty-note">&mdash; manual entry &mdash;</p>
+    </div>
+    {% endif %}
+
+    {% if result.get('raw_lunch') %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-no">03</span>
+        <span class="ticket-title">Raw Toast data &mdash; lunch cutoff pull</span>
+        <span class="ticket-tag">unmodified, straight from the CSVs</span>
+      </div>
+      {% set raw = result.raw_lunch %}
+      {% include "_sales_summary_raw.html" %}
+    </div>
+    {% endif %}
+
+    {% if result.get('raw_final') %}
+    <div class="ticket">
+      <div class="ticket-header">
+        <span class="ticket-no">04</span>
+        <span class="ticket-title">Raw Toast data &mdash; final/closing pull</span>
+        <span class="ticket-tag">unmodified, straight from the CSVs</span>
+      </div>
+      {% set raw = result.raw_final %}
+      {% include "_sales_summary_raw.html" %}
+    </div>
+    {% endif %}
+
+    {% if not result.get('lunch_layout') and not result.get('dinner_layout') %}
+    <div class="ticket"><p class="empty-note">No files were processed. Go back and choose at least one Sales Summary .zip.</p></div>
+    {% endif %}
+  </div>
+  {% if not error %}
+  <script src="/static/file_cache.js?v={{ asset_version }}"></script>
+  <script>AvraFileCache.clear('daily_summary', ['toast_sales_lunch', 'toast_sales_final']);</script>
+  <script src="/static/results_cache.js?v={{ asset_version }}"></script>
+  <script>AvraResultsCache.initResultsPage('daily_summary');</script>
+  {% endif %}
+</body>
+</html>

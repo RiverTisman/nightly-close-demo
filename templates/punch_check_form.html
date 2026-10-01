@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nightly Close &mdash; Punch Report Check</title>
+<script src="/static/results_cache.js?v={{ asset_version }}"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { AvraResultsCache.restore('punch_check'); });</script>
+<link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+</head>
+<body>
+  {% include "_nav.html" %}
+  <div class="ticket-rail">
+    <header class="masthead">
+      <span class="masthead-mark">Standalone audit &middot; any day</span>
+      <h1>Punch Report Check</h1>
+      <p class="subtitle">ADP against yesterday's Tip Sheet &mdash; everyone clocked in correctly, on the sheet if they worked, off it if they didn't. Runs independently of the Daily Close.</p>
+    </header>
+
+    <form action="/punch-report-check" method="post" enctype="multipart/form-data" class="ticket">
+    <div class="demo-load">
+      <button type="button" id="demo-load" class="demo-load-button">Load sample files</button>
+      <span class="fine-print">Fills in the date and every upload below with tonight's fictional exports.</span>
+    </div>
+
+      <div class="shift-select">
+        <span class="date-field-label">Which service is this?</span>
+        <label><input type="radio" name="shift_filter" value="BOTH" checked> Full day</label>
+        <label><input type="radio" name="shift_filter" value="AM"> Lunch (AM)</label>
+        <label><input type="radio" name="shift_filter" value="PM"> Dinner (PM)</label>
+        <span class="fine-print">Shifts the app can't confidently classify are always shown either way.</span>
+      </div>
+
+      <label class="date-field">
+        <span class="date-field-label">Date to check</span>
+        <input type="date" name="roster_date">
+      </label>
+
+      <div class="ticket-header">
+        <span class="ticket-no">01</span>
+        <span class="ticket-title">ADP Punch Report</span>
+        <span class="ticket-tag">clock-in/out check</span>
+      </div>
+      <label class="dropzone">
+        <input type="file" name="adp_punches" accept=".csv" data-persist>
+        <span class="dropzone-label">Drop the Punch Source Report CSV here, or click to browse</span>
+        <span class="dropzone-ext">.csv</span>
+      </label>
+
+      <div class="ticket-header">
+        <span class="ticket-no">02</span>
+        <span class="ticket-title">Tip Sheet (previous day)</span>
+        <span class="ticket-tag">weekly workbook</span>
+      </div>
+      <label class="dropzone">
+        <input type="file" name="tip_sheet_daily" accept=".xlsx" data-persist>
+        <span class="dropzone-label">Drop the week's Tip Sheet .xlsx here, or click to browse</span>
+        <span class="dropzone-ext">.xlsx</span>
+      </label>
+      <p class="fine-print" style="margin:-14px 26px 18px;">Upload the whole weekly workbook &mdash; the day+shift tab matching the date above is picked automatically. Flags anyone on the sheet with no punch, punched in but missing from the sheet, improper clock in/clock out, or in the wrong department.</p>
+
+      <div class="ticket-header">
+        <span class="ticket-no">03</span>
+        <span class="ticket-title">HotSchedules Roster</span>
+        <span class="ticket-tag">optional &middot; recommended clock-out times</span>
+      </div>
+      <label class="dropzone">
+        <input type="file" name="hotschedules_daily" accept=".xls,.xlsx" data-persist>
+        <span class="dropzone-label">Drop the daily roster file here, or click to browse</span>
+        <span class="dropzone-ext">.xlsx</span>
+      </label>
+      <p class="fine-print" style="margin:-14px 26px 18px;">Export as <strong>Excel XP-2007</strong> from HotSchedules' Roster Report export menu. Not required to check clock-ins/outs generally, but if anyone forgot to clock out, this is what lets the app suggest a clock-out time based on when their fellow Openers/Mids/Closers in the same role actually left that shift.</p>
+
+      <button type="submit" class="fire-button">Fire</button>
+    </form>
+  </div>
+  <script src="/static/file_cache.js?v={{ asset_version }}"></script>
+  <script src="/static/ui.js?v={{ asset_version }}"></script>
+  <script src="/static/date_memory.js?v={{ asset_version }}"></script>
+  <script>
+    AvraFileCache.init('punch_check');
+    AvraDateMemory.init();
+  </script>
+  <script src="/static/demo.js?v={{ asset_version }}"></script>
+  <script>NightlyCloseDemo.init('demo-load', {adp_punches: "adp_punch_report.csv", tip_sheet_daily: "tip_sheet_week.xlsx", hotschedules_daily: "hotschedules_roster.xls"});</script>
+</body>
+</html>
