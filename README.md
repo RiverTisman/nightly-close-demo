@@ -6,7 +6,9 @@ A web app I built for the full-service restaurant I manage (≈150–200 staff) 
 
 ## Try it
 
-Open the live demo, press **Load sample files**, then **Fire**. Two pages:
+Open the live demo, press **Load sample files**, then **Fire**. A step-by-step guide at the top of each page walks you through it, and speech-bubble notes explain every feature in plain words (switch them off with **Hide explanations**).
+
+Two pages:
 
 | Page | Inputs | What comes back |
 | --- | --- | --- |

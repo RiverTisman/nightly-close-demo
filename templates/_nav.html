@@ -9,8 +9,49 @@
   </nav>
 </header>
 <div class="top-nav-divider"></div>
+<script>document.body.setAttribute('data-page', '{{ active_page }}');</script>
 <div class="demo-banner">
-  <strong>Live demo &middot; fictional data.</strong>
-  Every name, number and file here is invented (&ldquo;Harbor &amp; Vine,&rdquo; Thursday 9/24/26). The checks are the real production code.
-  Built by River Tisman.
+  <div class="demo-banner-text">
+    <strong>Live demo &middot; fictional data.</strong>
+    Every name, number and file here is invented (&ldquo;Harbor &amp; Vine,&rdquo; Thursday 9/24/26). The checks are the real production code.
+    Built by <a href="https://rivertisman.github.io/nightly-close/">River Tisman</a>.
+  </div>
+  <button type="button" id="explain-toggle" class="explain-toggle" aria-pressed="true">Hide explanations</button>
 </div>
+
+{% set on_results = result is defined %}
+<section class="demo-guide" aria-label="How to try it">
+  {% if active_page == 'daily_close' and not on_results %}
+  <h2 class="demo-guide-title">How to try it</h2>
+  <ol class="demo-steps">
+    <li class="demo-step is-current" data-step="1"><span class="demo-step-no">1</span><span>Press <b>Load sample files</b> in the form below. It fills in a made-up Thursday night.</span></li>
+    <li class="demo-step" data-step="2"><span class="demo-step-no">2</span><span>Press <b>Fire</b> at the bottom of the form.</span></li>
+    <li class="demo-step" data-step="3"><span class="demo-step-no">3</span><span>Look through the results. Anything marked <b>REVIEW</b> is something a manager needs to decide.</span></li>
+  </ol>
+
+  {% elif active_page == 'daily_close' and on_results %}
+  <h2 class="demo-guide-title">What you&rsquo;re looking at</h2>
+  <ol class="demo-steps">
+    <li class="demo-step is-current"><span class="demo-step-no">1</span><span>Each list is ready to paste into the restaurant&rsquo;s tip sheet. The <b>Copy for Excel</b> buttons copy it in the right format.</span></li>
+    <li class="demo-step"><span class="demo-step-no">2</span><span>Rows marked <b>REVIEW</b> need a manager to decide. The reason is written under each one.</span></li>
+    <li class="demo-step"><span class="demo-step-no">3</span><span>Then try the <a href="/punch-report-check">Punch Report Check</a>, which compares the time clock with the finished tip sheet.</span></li>
+  </ol>
+
+  {% elif active_page == 'punch_check' and not on_results %}
+  <h2 class="demo-guide-title">How to try it</h2>
+  <ol class="demo-steps">
+    <li class="demo-step is-current" data-step="1"><span class="demo-step-no">1</span><span>Press <b>Load sample files</b> in the form below.</span></li>
+    <li class="demo-step" data-step="2"><span class="demo-step-no">2</span><span>Press <b>Fire</b> at the bottom of the form.</span></li>
+    <li class="demo-step" data-step="3"><span class="demo-step-no">3</span><span>Read the red rows. Each one is a mistake that would have paid someone wrong.</span></li>
+  </ol>
+
+  {% elif active_page == 'punch_check' and on_results %}
+  <h2 class="demo-guide-title">What you&rsquo;re looking at</h2>
+  <ol class="demo-steps">
+    <li class="demo-step is-current"><span class="demo-step-no">1</span><span>The time clock (ADP) compared with the finished tip sheet for the same day. Start with anything red.</span></li>
+    <li class="demo-step"><span class="demo-step-no">2</span><span>The first box found <b>Tomas Reyes</b> spelled with one extra space on the tip sheet. On a real sheet, that one space makes his pay add up to $0.</span></li>
+    <li class="demo-step"><span class="demo-step-no">3</span><span>Further down: a forgotten clock-out with a suggested time, someone cut early, and people listed in the wrong group.</span></li>
+  </ol>
+  {% endif %}
+</section>
+<script src="/static/explain.js?v={{ asset_version }}" defer></script>

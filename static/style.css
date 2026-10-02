@@ -843,3 +843,66 @@ td.pending, td .pending {
   .top-nav-mark { font-size: 24px; }
 }
 .top-nav { padding-top: 22px; }
+
+/* Demo banner: text + explanations switch */
+.demo-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px 18px; flex-wrap: wrap; }
+.demo-banner-text { flex: 1 1 420px; min-width: 0; }
+.demo-banner a { font-weight: 600; }
+.explain-toggle {
+  font: inherit; font-size: 13px; font-weight: 600;
+  padding: 6px 12px; border: 1px solid var(--accent); background: transparent;
+  color: var(--accent); cursor: pointer; border-radius: 999px; white-space: nowrap;
+}
+.explain-toggle:hover { background: #eef5f3; }
+.explain-toggle:focus-visible, .demo-download:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Step-by-step guide */
+.demo-guide {
+  max-width: 884px; margin: 14px auto 0; padding: 16px 18px 18px;
+  background: var(--surface); border: 1px solid var(--card-border);
+}
+.demo-guide-title { margin: 0 0 10px; font-size: 17px; color: var(--ink); }
+.demo-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.demo-step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; color: var(--muted); font-size: 15px; line-height: 1.45; }
+.demo-step b { color: var(--ink); }
+.demo-step-no {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 13px; font-weight: 700; border: 1.5px solid var(--field-border); color: var(--muted); background: var(--field-bg);
+}
+.demo-step.is-current { color: var(--body-text); }
+.demo-step.is-current .demo-step-no { background: var(--accent); border-color: var(--accent); color: #fff; }
+.demo-step.is-done .demo-step-no { background: var(--good); border-color: var(--good); color: #fff; font-size: 0; }
+.demo-step.is-done .demo-step-no::after { content: "\2713"; font-size: 14px; }
+.demo-step.is-done span:last-child { text-decoration: line-through; text-decoration-color: var(--muted-light); }
+.demo-download {
+  display: inline-block; margin-top: 12px; padding: 8px 14px; font-weight: 700; font-size: 14px;
+  border: 1.5px solid var(--accent); color: var(--accent); text-decoration: none;
+}
+.demo-download:hover { background: #eef5f3; }
+@media (prefers-reduced-motion: no-preference) {
+  .demo-step.is-current .demo-step-no { animation: demo-pulse 1.8s ease-out 2; }
+  @keyframes demo-pulse { 0% { box-shadow: 0 0 0 0 rgba(15,125,107,.45); } 100% { box-shadow: 0 0 0 10px rgba(15,125,107,0); } }
+}
+
+/* Explainer bubbles */
+.explain-bubble {
+  position: relative; display: flex; gap: 8px; align-items: flex-start;
+  margin: 10px 26px 12px; padding: 9px 12px; max-width: 620px;
+  background: #eef5f3; border: 1px solid #cfe3dd; border-radius: 12px 12px 12px 3px;
+  color: var(--body-text); font-size: 14px; line-height: 1.45; font-style: normal; font-weight: 400;
+  letter-spacing: 0; text-transform: none;
+}
+.explain-icon {
+  flex: 0 0 18px; width: 18px; height: 18px; margin-top: 1px; background: var(--accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.explain-bubble.explain-inline { margin: 8px 0 0; font-size: 13px; }
+.demo-load + .explain-bubble, .fire-button + .explain-bubble { margin-left: 26px; }
+.explain-hidden .explain-bubble { display: none; }
+@media (max-width: 640px) {
+  .demo-guide { margin: 12px 16px 0; }
+  .explain-bubble { margin-left: 14px; margin-right: 14px; }
+}
+.explain-bubble.explain-flush { margin: 8px 0 12px; }
+.shift-select + .explain-bubble { margin-top: 0; }

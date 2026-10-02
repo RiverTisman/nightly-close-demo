@@ -38,12 +38,17 @@
         Promise.all(jobs).then(function () {
           btn.textContent = 'Sample files loaded — press Fire';
           btn.classList.add('demo-loaded');
+          document.querySelectorAll('.demo-step[data-step]').forEach(function (s) {
+            var n = s.getAttribute('data-step');
+            s.classList.toggle('is-done', n === '1');
+            s.classList.toggle('is-current', n === '2');
+          });
           var fire = form.querySelector('.fire-button');
           if (fire) fire.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }).catch(function (e) {
           btn.disabled = false;
           btn.textContent = 'Load sample files';
-          alert(e.message);
+          btn.insertAdjacentHTML('afterend', '<span class="fine-print" style="color:var(--review)">Couldn\'t load the sample files. Refresh the page and try again.</span>');
         });
       });
     }
